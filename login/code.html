@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3b82f6", // Using blue-500 from the reference screen
+                        "accent": "#10b981",  // Using emerald-500 from reference
+                        "background-dark": "#0f172a", // Navy color from reference
+                        "background-darker": "#1e293b",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.375rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-image: radial-gradient(circle at top left, #1e293b, #0f172a);
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-effect {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .sidebar-glass {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .inner-glow {
+            box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="font-display text-slate-100 min-h-screen">
+<div class="relative flex h-screen w-full overflow-hidden">
+<div class="relative z-10 flex h-full w-full">
+<!-- Sidebar for Saved Connections -->
+<aside class="w-80 sidebar-glass border-r border-white/10 flex flex-col hidden lg:flex">
+<div class="p-6 border-b border-white/10">
+<div class="flex items-center gap-3">
+<div class="bg-primary p-2 rounded-lg">
+<span class="material-symbols-outlined text-white">terminal</span>
+</div>
+<div>
+<h1 class="text-white text-lg font-bold leading-none">SSH Client</h1>
+<p class="text-primary/70 text-xs mt-1">v2.4.0</p>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<div class="px-2">
+<p class="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-4">Saved Connections</p>
+<div class="space-y-2">
+<button class="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-white/10 text-white border border-white/10 group transition-all inner-glow">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">database</span>
+<div class="text-left">
+<p class="text-sm font-semibold">Production DB</p>
+<p class="text-[10px] text-slate-400">10.0.4.12:22</p>
+</div>
+</button>
+<button class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-slate-400 border border-transparent group transition-all">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">cloud_queue</span>
+<div class="text-left">
+<p class="text-sm font-semibold">Staging Web</p>
+<p class="text-[10px] text-slate-500">staging.server.io</p>
+</div>
+</button>
+<button class="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 text-slate-400 border border-transparent group transition-all">
+<span class="material-symbols-outlined text-slate-500 group-hover:text-primary transition-colors">dns</span>
+<div class="text-left">
+<p class="text-sm font-semibold">Legacy Backup</p>
+<p class="text-[10px] text-slate-500">backup.local</p>
+</div>
+</button>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-white/10">
+<button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</button>
+</div>
+</aside>
+<!-- Main Login Area -->
+<main class="flex-1 flex flex-col items-center justify-center p-6 bg-black/10">
+<div class="max-w-md w-full glass-effect rounded-2xl p-8 shadow-2xl">
+<div class="mb-8 text-center">
+<h2 class="text-3xl font-bold text-white tracking-tight">New Connection</h2>
+<p class="text-slate-400 mt-2 text-sm">Enter server credentials to begin session</p>
+</div>
+<form class="space-y-5">
+<div class="space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Host Address</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-slate-500 group-focus-within:text-primary transition-colors">language</span>
+</div>
+<input class="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all" placeholder="e.g. 192.168.1.1 or server.com" type="text"/>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div class="col-span-2 space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Username</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-slate-500 group-focus-within:text-primary transition-colors">person</span>
+</div>
+<input class="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all" placeholder="root" type="text"/>
+</div>
+</div>
+<div class="col-span-1 space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Port</label>
+<input class="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all text-center" placeholder="22" type="text"/>
+</div>
+</div>
+<div class="space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Password / SSH Key</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-slate-500 group-focus-within:text-primary transition-colors">lock</span>
+</div>
+<input class="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all" placeholder="••••••••••••" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between py-2">
+<label class="flex items-center cursor-pointer group">
+<div class="relative">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-10 h-5 bg-black/40 rounded-full border border-white/10 peer-checked:bg-primary transition-colors"></div>
+<div class="absolute left-1 top-1 w-3 h-3 bg-slate-500 rounded-full transition-all peer-checked:left-6 peer-checked:bg-white"></div>
+</div>
+<span class="ml-3 text-sm text-slate-400 group-hover:text-white transition-colors">Save connection</span>
+</label>
+<a class="text-xs font-medium text-primary hover:text-primary/80 transition-colors" href="#">Advanced Settings</a>
+</div>
+<button class="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-transform active:scale-95 inner-glow" type="submit">
+<span class="material-symbols-outlined">bolt</span>
+                    Connect Now
+                </button>
+</form>
+<div class="mt-8 flex items-center justify-center gap-4 text-slate-500 text-[11px] uppercase tracking-wide">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-accent">security</span> AES-256</span>
+<span class="w-1 h-1 bg-white/10 rounded-full"></span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-accent">vpn_key</span> SSH Key</span>
+</div>
+</div>
+<!-- Footer / Help -->
+<div class="mt-8 flex gap-6 text-slate-500 text-sm font-medium">
+<a class="hover:text-primary transition-colors" href="#">Documentation</a>
+<a class="hover:text-primary transition-colors" href="#">Support</a>
+<a class="hover:text-primary transition-colors" href="#">Key Manager</a>
+</div>
+</main>
+</div>
+</div>
+</body></html>

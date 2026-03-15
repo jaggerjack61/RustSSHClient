@@ -1,0 +1,29 @@
+[package]
+name = "rust_ssh_client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aes-gcm = "0.10"
+arboard = "3.6"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["clock", "serde"] }
+crossbeam-channel = "0.5"
+directories = "5"
+iced = { version = "0.14", features = ["tokio", "highlighter"] }
+keyring = "3"
+rand = "0.8"
+rfd = "0.15"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ssh2 = { version = "0.9", features = ["vendored-openssl", "openssl-on-win32"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+vt100 = "0.16"
+walkdir = "2"
+webbrowser = "1"
+
+[dev-dependencies]
+tempfile = "3"

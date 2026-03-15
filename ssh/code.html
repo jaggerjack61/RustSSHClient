@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Modern SSH Desktop Interface</title>
+<!-- Tailwind CSS CDN with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="custom-fonts">
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-image: radial-gradient(circle at top left, #1e293b, #0f172a);
+    }
+    
+    .mono-font {
+      font-family: 'JetBrains+Mono', monospace;
+    }
+  </style>
+<style data-purpose="glassmorphism-effects">
+    /* Glassmorphism style for the main application container */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Subtle inner glow for active elements */
+    .inner-glow {
+      box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    }
+
+    /* Custom scrollbar for a cleaner look */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body class="h-full flex items-center justify-center p-4 md:p-8 overflow-hidden">
+<!-- BEGIN: ApplicationWindow -->
+<main class="glass-panel w-full h-full max-w-7xl max-h-[850px] rounded-xl shadow-2xl flex flex-col overflow-hidden" data-purpose="main-application-container" id="app-window">
+<!-- BEGIN: TitleBar -->
+<header class="h-10 flex items-center justify-between px-4 border-b border-white/10 flex-shrink-0 select-none" data-purpose="title-bar">
+<div class="flex items-center gap-3">
+<!-- App Icon Placeholder -->
+<svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect height="14" rx="2" ry="2" width="20" x="2" y="3"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+<span class="text-xs font-medium text-slate-400 tracking-wide uppercase">SSH Session: production-server-01</span>
+</div>
+<!-- Window Controls -->
+<div class="flex items-center gap-4">
+<button class="text-slate-500 hover:text-white transition-colors">
+<svg fill="currentColor" height="16" viewbox="0 0 256 256" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M216,136H40a8,8,0,0,1,0-16H216a8,8,0,0,1,0,16Z"></path></svg>
+</button>
+<button class="text-slate-500 hover:text-white transition-colors">
+<svg fill="currentColor" height="16" viewbox="0 0 256 256" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M216,40V216a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V40a8,8,0,0,1,8-8H208A8,8,0,0,1,216,40ZM192,56H64V192H192Z"></path></svg>
+</button>
+<button class="text-slate-500 hover:text-red-400 transition-colors">
+<svg fill="currentColor" height="16" viewbox="0 0 256 256" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path></svg>
+</button>
+</div>
+</header>
+<!-- END: TitleBar -->
+<!-- Main Content Area -->
+<div class="flex flex-1 overflow-hidden">
+<!-- BEGIN: FileExplorer -->
+<aside class="w-64 border-r border-white/10 flex flex-col bg-black/20" data-purpose="tree-style-file-explorer">
+<div class="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest flex justify-between items-center">
+<span>Explorer</span>
+<button class="hover:text-white"><svg fill="currentColor" height="14" viewbox="0 0 256 256" width="14" xmlns="http://www.w3.org/2000/svg"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg></button>
+</div>
+<nav class="flex-1 overflow-y-auto px-2 py-1 text-sm">
+<!-- Folder Item -->
+<div class="group">
+<div class="flex items-center gap-2 py-1 px-2 text-slate-300 hover:bg-white/5 rounded cursor-pointer transition-colors">
+<svg class="w-4 h-4 text-blue-400/80" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+<span>src</span>
+</div>
+<!-- Sub-items -->
+<div class="ml-4 border-l border-white/10 pl-2">
+<div class="flex items-center gap-2 py-1 px-2 text-slate-400 hover:bg-white/5 rounded cursor-pointer transition-colors">
+<svg class="w-4 h-4 text-yellow-500/80" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+<span>app.js</span>
+</div>
+<div class="flex items-center gap-2 py-1 px-2 text-slate-400 hover:bg-white/5 rounded cursor-pointer transition-colors">
+<svg class="w-4 h-4 text-blue-400/80" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+<span>utils.ts</span>
+</div>
+</div>
+</div>
+<!-- Active File Item -->
+<div class="flex items-center gap-2 py-1 px-2 text-white bg-white/10 rounded cursor-pointer mt-1">
+<svg class="w-4 h-4 text-orange-400/80" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+<span>config.json</span>
+</div>
+<!-- Other Files -->
+<div class="flex items-center gap-2 py-1 px-2 text-slate-400 hover:bg-white/5 rounded cursor-pointer transition-colors mt-1">
+<svg class="w-4 h-4 text-slate-400/80" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+<span>README.md</span>
+</div>
+<div class="flex items-center gap-2 py-1 px-2 text-slate-400 hover:bg-white/5 rounded cursor-pointer transition-colors mt-1">
+<svg class="w-4 h-4 text-red-400/80" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+<span>.env</span>
+</div>
+</nav>
+<!-- Sidebar Footer -->
+<div class="p-3 border-t border-white/10 bg-black/10">
+<div class="flex items-center gap-2 text-[11px] text-slate-500">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<span>Connected: 12.4ms</span>
+</div>
+</div>
+</aside>
+<!-- END: FileExplorer -->
+<!-- BEGIN: Terminal -->
+<section class="flex-1 flex flex-col bg-black/30" data-purpose="terminal-window">
+<!-- Terminal Header/Tabs -->
+<div class="h-9 flex items-center bg-black/40 border-b border-white/5 px-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-white/5 border-b-2 border-blue-500 text-xs text-white">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+<span>bash</span>
+</div>
+</div>
+<!-- Terminal Output Area -->
+<div class="flex-1 p-6 overflow-y-auto mono-font text-sm leading-relaxed text-slate-300" id="terminal-output">
+<div class="mb-2 text-blue-400">Last login: Tue Oct 24 14:32:01 2023 from 192.168.1.45</div>
+<div class="mb-4">
+<span class="text-emerald-400 font-medium">user@production-server-01</span>:<span class="text-blue-400">~</span>$ uptime
+            <br/>
+<span class="text-slate-400"> 14:35:05 up 42 days, 18:24,  1 user,  load average: 0.08, 0.12, 0.15</span>
+</div>
+<div class="mb-4">
+<span class="text-emerald-400 font-medium">user@production-server-01</span>:<span class="text-blue-400">~</span>$ ls -la
+            <br/>
+<span class="grid grid-cols-4 gap-4 mt-1 opacity-90">
+<span>drwxr-xr-x  5 user group  4096 .</span>
+<span>-rw-r--r--  1 user group   220 .bash_logout</span>
+<span>-rw-r--r--  1 user group  3771 .bashrc</span>
+<span>drwxr-xr-x  3 user group  4096 .local</span>
+<span>-rw-r--r--  1 user group   807 .profile</span>
+<span>drwxrwxr-x  4 user group  4096 src</span>
+</span>
+</div>
+<div class="mb-4">
+<span class="text-emerald-400 font-medium">user@production-server-01</span>:<span class="text-blue-400">~</span>$ git status
+            <br/>
+<span class="text-slate-400">On branch main</span><br/>
+<span class="text-slate-400">Your branch is up to date with 'origin/main'.</span><br/>
+<span class="text-slate-400">nothing to commit, working tree clean</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-emerald-400 font-medium">user@production-server-01</span>:<span class="text-blue-400">~</span>$ 
+            <span class="inline-block w-2 h-5 bg-white/80 animate-[pulse_1s_infinite]"></span>
+</div>
+</div>
+<!-- Terminal Quick Actions -->
+<div class="h-10 px-4 border-t border-white/5 bg-black/20 flex items-center justify-between text-[11px] text-slate-500 uppercase tracking-wide">
+<div class="flex gap-6">
+<span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> UTF-8</span>
+<span class="flex items-center gap-1.5">SSHv2</span>
+</div>
+<div class="flex gap-4">
+<button class="hover:text-white transition-colors">Clear</button>
+<button class="hover:text-white transition-colors">Scrollback</button>
+<button class="text-blue-400 hover:text-blue-300 transition-colors font-bold">New Session</button>
+</div>
+</div>
+</section>
+<!-- END: Terminal -->
+</div>
+</main>
+<!-- END: ApplicationWindow -->
+<script data-purpose="terminal-interaction">
+    // Simple script to keep the cursor blinking and potentially handle mock inputs
+    document.addEventListener('keydown', (e) => {
+      // In a real app, this would handle terminal inputs
+      // For this static demo, we just focus on the aesthetic
+    });
+  </script>
+</body></html>
