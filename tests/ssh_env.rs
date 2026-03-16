@@ -72,3 +72,24 @@ fn can_upload_and_download_a_file_round_trip() {
 
     sftp_client::delete_entry(&sftp, &remote_path).expect("cleanup remote file");
 }
+
+#[test]
+#[ignore = "requires TEST_SSH_* environment variables and a readable child directory"]
+fn can_expand_a_directory_in_tree_view() {
+    let request = env_request().expect("missing TEST_SSH_* environment variables");
+    let session = connect_session(&request, None).expect("connect session");
+    let home = resolve_home_directory(&session).expect("resolve home");
+    let sftp = session.sftp().expect("create sftp");
+    let entries = sftp_client::list_directory(&sftp, &home).expect("list remote home");
+
+    let directory = entries
+        .iter()
+        .find(|entry| entry.is_directory())
+        .expect("expected at least one readable directory in remote home");
+
+    let child_entries =
+        sftp_client::list_directory(&sftp, &directory.path).expect("list child directory");
+
+    assert!(directory.path.starts_with('/'));
+    assert!(child_entries.iter().all(|entry| entry.path.starts_with(&directory.path)));
+}

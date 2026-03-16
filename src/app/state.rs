@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 use iced::Task;
@@ -87,6 +88,10 @@ pub struct WorkspaceState {
     pub active_tab: WorkspaceTab,
     pub transfers: Vec<TransferProgress>,
     pub pending_file_action: Option<PendingFileAction>,
+    pub expanded_folders: HashSet<String>,
+    pub loaded_folders: HashSet<String>,
+    pub loading_folders: HashSet<String>,
+    pub show_properties: bool,
     pub terminal_cursor_visible: bool,
     pub last_terminal_cursor_toggle: Instant,
 }
@@ -108,6 +113,10 @@ impl Default for WorkspaceState {
             active_tab: WorkspaceTab::Terminal,
             transfers: Vec::new(),
             pending_file_action: None,
+            expanded_folders: HashSet::new(),
+            loaded_folders: HashSet::new(),
+            loading_folders: HashSet::new(),
+            show_properties: false,
             terminal_cursor_visible: true,
             last_terminal_cursor_toggle: Instant::now(),
         }

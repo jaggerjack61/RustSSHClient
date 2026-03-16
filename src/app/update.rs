@@ -350,6 +350,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
         Message::RefreshDirectory => {
             state.workspace.explorer_context_for = None;
+            state.workspace.show_properties = false;
             let _ = request_directory_refresh(
                 state,
                 Some(state.workspace.current_directory.clone()),
@@ -358,6 +359,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
         Message::NavigateUpDirectory => {
             state.workspace.explorer_context_for = None;
+            state.workspace.show_properties = false;
             let parent = parent_directory(&state.workspace.current_directory);
             if parent != state.workspace.current_directory {
                 let _ = request_directory_refresh(state, Some(parent));
@@ -371,6 +373,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::ExplorerEntryPressed(path) => {
             state.workspace.selected_file = Some(path.clone());
             state.workspace.explorer_context_for = None;
+            state.workspace.show_properties = false;
             if let Some(entry) = state
                 .workspace
                 .files
@@ -378,7 +381,33 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 .find(|entry| entry.path == path)
             {
                 if entry.is_directory() {
-                    let _ = request_directory_refresh(state, Some(entry.path.clone()));
+                    if state.workspace.expanded_folders.contains(&path) {
+                        state.workspace.expanded_folders.remove(&path);
+                    } else if state.workspace.loaded_folders.contains(&path) {
+                        state.workspace.expanded_folders.insert(path);
+                    } else {
+                        state.workspace.expanded_folders.insert(path.clone());
+                        let _ = request_directory_children(state, path);
+                    }
+                }
+            }
+            Task::none()
+        }
+        Message::ExplorerEntryDoubleClicked(path) => {
+            state.workspace.selected_file = Some(path.clone());
+            state.workspace.explorer_context_for = None;
+            state.workspace.show_properties = false;
+            if let Some(is_directory) = state
+                .workspace
+                .files
+                .iter()
+                .find(|entry| entry.path == path)
+                .map(|entry| entry.is_directory())
+            {
+                if is_directory {
+                    let _ = request_directory_refresh(state, Some(path));
+                } else {
+                    return update(state, Message::OpenSelectedFileInEditor);
                 }
             }
             Task::none()
@@ -386,6 +415,23 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::ExplorerEntrySecondaryPressed(path) => {
             state.workspace.selected_file = Some(path.clone());
             state.workspace.explorer_context_for = Some(path);
+            Task::none()
+        }
+        Message::ToggleExpandedFolder(path) => {
+            if state.workspace.expanded_folders.contains(&path) {
+                state.workspace.expanded_folders.remove(&path);
+            } else {
+                state.workspace.expanded_folders.insert(path);
+            }
+            Task::none()
+        }
+        Message::ShowProperties => {
+            state.workspace.explorer_context_for = None;
+            state.workspace.show_properties = true;
+            Task::none()
+        }
+        Message::DismissProperties => {
+            state.workspace.show_properties = false;
             Task::none()
         }
         Message::OpenSelectedFileInEditor => {
@@ -672,6 +718,9 @@ fn drain_session_events(state: &mut AppState) -> Task<Message> {
                 state.workspace.current_directory = cwd;
                 state.workspace.pending_directory = None;
                 state.workspace.files = entries;
+                state.workspace.expanded_folders.clear();
+                state.workspace.loaded_folders.clear();
+                state.workspace.loading_folders.clear();
                 state.workspace.explorer_context_for = None;
                 state.workspace.selected_file = selected_file.filter(|selected| {
                     state
@@ -680,6 +729,11 @@ fn drain_session_events(state: &mut AppState) -> Task<Message> {
                         .iter()
                         .any(|entry| entry.path == *selected)
                 });
+            }
+            SessionEvent::DirectoryChildrenLoaded { directory, entries } => {
+                state.workspace.loading_folders.remove(&directory);
+                state.workspace.loaded_folders.insert(directory.clone());
+                merge_directory_children(&mut state.workspace.files, &directory, entries);
             }
             SessionEvent::FileOpened { path, contents } => {
                 state.workspace.apply_editor_content(&path, contents);
@@ -718,6 +772,14 @@ fn drain_session_events(state: &mut AppState) -> Task<Message> {
                     );
                 }
             }
+            SessionEvent::DirectoryChildrenLoadFailed { directory, error } => {
+                state.workspace.loading_folders.remove(&directory);
+                state.workspace.expanded_folders.remove(&directory);
+                state.notification(
+                    NotificationLevel::Error,
+                    format!("Unable to expand remote directory {directory}: {error}"),
+                );
+            }
             SessionEvent::Transfer(update) => {
                 merge_transfer(&update, &mut state.workspace.transfers);
                 if matches!(update.status, TransferStatus::Failed(_)) {
@@ -730,6 +792,9 @@ fn drain_session_events(state: &mut AppState) -> Task<Message> {
                 state.workspace.session = None;
                 state.workspace.pending_directory = None;
                 state.workspace.explorer_context_for = None;
+                state.workspace.expanded_folders.clear();
+                state.workspace.loaded_folders.clear();
+                state.workspace.loading_folders.clear();
                 state.workspace.reset_editor_tabs();
                 state.route = Route::Login;
                 state.notification(NotificationLevel::Info, "SSH session ended.");
@@ -771,8 +836,39 @@ fn request_directory_refresh(state: &mut AppState, path: Option<String>) -> bool
     }
 }
 
+fn request_directory_children(state: &mut AppState, path: String) -> bool {
+    if state.workspace.loading_folders.contains(&path) {
+        return true;
+    }
+
+    state.workspace.loading_folders.insert(path.clone());
+    if send_session_command(state, SessionCommand::LoadDirectoryChildren(path.clone())) {
+        true
+    } else {
+        state.workspace.loading_folders.remove(&path);
+        state.workspace.expanded_folders.remove(&path);
+        false
+    }
+}
+
 fn should_notify_directory_open_failure(pending_directory: Option<&str>, failed_path: &str) -> bool {
     pending_directory == Some(failed_path)
+}
+
+fn merge_directory_children(
+    files: &mut Vec<crate::models::FileEntry>,
+    directory: &str,
+    entries: Vec<crate::models::FileEntry>,
+) {
+    files.retain(|entry| {
+        entry.path == directory || !is_descendant_path(&entry.path, directory)
+    });
+    files.extend(entries);
+}
+
+fn is_descendant_path(path: &str, directory: &str) -> bool {
+    let prefix = format!("{}/", directory.trim_end_matches('/'));
+    path.starts_with(&prefix)
 }
 
 fn parent_directory(current_directory: &str) -> String {
@@ -1078,6 +1174,80 @@ mod tests {
 
         assert!(state.workspace.editor_tabs.is_empty());
         assert!(command_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn double_clicking_a_file_opens_it_in_editor() {
+        let (command_tx, command_rx) = unbounded();
+        let (_event_tx, event_rx) = unbounded();
+        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+
+        state.workspace.files = vec![text_file_entry("/srv/app/README.md", "README.md")];
+
+        let _ = super::update(
+            &mut state,
+            Message::ExplorerEntryDoubleClicked("/srv/app/README.md".into()),
+        );
+
+        assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app/README.md"));
+        assert_eq!(state.workspace.editor_tabs.len(), 1);
+        assert_eq!(state.workspace.active_tab, WorkspaceTab::Editor("/srv/app/README.md".into()));
+        assert_eq!(
+            command_rx.try_recv().expect("editor read command"),
+            SessionCommand::ReadFile {
+                remote_path: "/srv/app/README.md".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn single_clicking_directory_requests_lazy_child_load() {
+        let (command_tx, command_rx) = unbounded();
+        let (_event_tx, event_rx) = unbounded();
+        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        state.workspace.files = vec![directory_entry("/srv/app/src", "src")];
+
+        let _ = super::update(
+            &mut state,
+            Message::ExplorerEntryPressed("/srv/app/src".into()),
+        );
+
+        assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app/src"));
+        assert!(state.workspace.expanded_folders.contains("/srv/app/src"));
+        assert_eq!(
+            command_rx.try_recv().expect("child load command"),
+            SessionCommand::LoadDirectoryChildren("/srv/app/src".into())
+        );
+    }
+
+    #[test]
+    fn directory_child_load_merges_entries_without_changing_current_directory() {
+        let (command_tx, _command_rx) = unbounded();
+        let (event_tx, event_rx) = unbounded();
+        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        state.workspace.current_directory = "/srv/app".into();
+        state.workspace.files = vec![
+            directory_entry("/srv/app/src", "src"),
+            text_file_entry("/srv/app/README.md", "README.md"),
+        ];
+        state.workspace.expanded_folders.insert("/srv/app/src".into());
+
+        event_tx
+            .send(SessionEvent::DirectoryChildrenLoaded {
+                directory: "/srv/app/src".into(),
+                entries: vec![text_file_entry("/srv/app/src/main.rs", "main.rs")],
+            })
+            .expect("queue child directory event");
+
+        let _ = super::update(&mut state, Message::Tick(Instant::now()));
+
+        assert_eq!(state.workspace.current_directory, "/srv/app");
+        assert!(state
+            .workspace
+            .files
+            .iter()
+            .any(|entry| entry.path == "/srv/app/src/main.rs"));
+        assert!(state.workspace.expanded_folders.contains("/srv/app/src"));
     }
 
     #[test]

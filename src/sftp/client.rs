@@ -17,29 +17,31 @@ pub fn list_directory(sftp: &Sftp, path: &str) -> AppResult<Vec<FileEntry>> {
     let mut entries = sftp
         .readdir(Path::new(path))?
         .into_iter()
-        .filter_map(|(entry_path, stat)| {
-            let name = entry_path.file_name()?.to_string_lossy().to_string();
-            if name == "." || name == ".." {
-                return None;
-            }
-
-            Some(FileEntry {
-                name,
-                path: normalize_remote_string(&entry_path),
-                kind: infer_kind(stat.perm),
-                size: stat.size.unwrap_or_default(),
-                permissions: format_permissions(stat.perm),
-                owner: stat.uid.map(|uid| uid.to_string()),
-                modified: stat
-                    .mtime
-                    .and_then(|seconds| DateTime::<Utc>::from_timestamp(seconds as i64, 0)),
-            })
-        })
+        .filter_map(|(entry_path, stat)| file_entry_from_dirent(entry_path, stat))
         .collect::<Vec<_>>();
 
     entries.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
     entries.sort_by_key(|entry| !entry.is_directory());
     Ok(entries)
+}
+
+fn file_entry_from_dirent(entry_path: PathBuf, stat: ssh2::FileStat) -> Option<FileEntry> {
+    let name = entry_path.file_name()?.to_string_lossy().to_string();
+    if name == "." || name == ".." {
+        return None;
+    }
+
+    Some(FileEntry {
+        name,
+        path: normalize_remote_string(&entry_path),
+        kind: infer_kind(stat.perm),
+        size: stat.size.unwrap_or_default(),
+        permissions: format_permissions(stat.perm),
+        owner: stat.uid.map(|uid| uid.to_string()),
+        modified: stat
+            .mtime
+            .and_then(|seconds| DateTime::<Utc>::from_timestamp(seconds as i64, 0)),
+    })
 }
 
 pub fn ensure_remote_directory(sftp: &Sftp, path: &Path) -> AppResult<()> {

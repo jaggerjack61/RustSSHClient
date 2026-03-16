@@ -17,6 +17,7 @@ use crate::ssh::client;
 pub enum SessionCommand {
     SendInput(Vec<u8>),
     RefreshDirectory(Option<String>),
+    LoadDirectoryChildren(String),
     ReadFile {
         remote_path: String,
     },
@@ -58,6 +59,10 @@ pub enum SessionEvent {
         cwd: String,
         entries: Vec<FileEntry>,
     },
+    DirectoryChildrenLoaded {
+        directory: String,
+        entries: Vec<FileEntry>,
+    },
     FileOpened {
         path: String,
         contents: String,
@@ -75,6 +80,10 @@ pub enum SessionEvent {
     },
     DirectoryOpenFailed {
         path: String,
+        error: String,
+    },
+    DirectoryChildrenLoadFailed {
+        directory: String,
         error: String,
     },
     Transfer(TransferProgress),
@@ -196,6 +205,22 @@ fn run_session(
 
                     if refresh_directory_or_report(&sftp, &next, &event_tx) {
                         cwd = next;
+                    }
+                }
+                SessionCommand::LoadDirectoryChildren(directory) => {
+                    match sftp_client::list_directory(&sftp, &directory) {
+                        Ok(entries) => {
+                            let _ = event_tx.send(SessionEvent::DirectoryChildrenLoaded {
+                                directory,
+                                entries,
+                            });
+                        }
+                        Err(error) => {
+                            let _ = event_tx.send(SessionEvent::DirectoryChildrenLoadFailed {
+                                directory,
+                                error: error.to_string(),
+                            });
+                        }
                     }
                 }
                 SessionCommand::ReadFile { remote_path } => {
