@@ -5,6 +5,25 @@ use iced::{Background, Border, Color, Element, Length, Shadow, Theme, Vector};
 use crate::app::messages::Message;
 use crate::app::state::{AppState, NotificationLevel};
 
+const TERMINAL_TOP_BAR_HEIGHT: f32 = 56.0;
+const TERMINAL_FOOTER_HEIGHT: f32 = 40.0;
+
+pub fn terminal_top_bar_height() -> f32 {
+    TERMINAL_TOP_BAR_HEIGHT
+}
+
+pub fn terminal_footer_height() -> f32 {
+    TERMINAL_FOOTER_HEIGHT
+}
+
+pub fn workspace_header_height() -> f32 {
+    terminal_top_bar_height()
+}
+
+pub fn workspace_footer_height() -> f32 {
+    terminal_footer_height()
+}
+
 // ---------------------------------------------------------------------------
 // Color palette – matches the HTML / Tailwind mockup
 // ---------------------------------------------------------------------------

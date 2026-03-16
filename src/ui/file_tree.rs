@@ -34,28 +34,36 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     );
 
     // --- Header ---
-    let header = container(column![
-        row![
-            text("EXPLORER")
-                .size(10)
-                .color(styles::text_slate_500()),
-            Space::new().width(Length::Fill),
-            refresh_button,
-            upload_button,
-        ]
-        .align_y(iced::Alignment::Center),
-        row![
-            up_button,
-            text(&state.workspace.current_directory)
-                .size(12)
-                .color(Color::WHITE)
+    let header = container(
+        container(
+            row![
+                column![
+                    text("EXPLORER")
+                        .size(10)
+                        .color(styles::text_slate_500()),
+                    row![
+                        up_button,
+                        text(&state.workspace.current_directory)
+                            .size(12)
+                            .color(Color::WHITE)
+                            .width(Length::Fill),
+                    ]
+                    .spacing(6)
+                    .align_y(iced::Alignment::Center),
+                ]
+                .spacing(2)
                 .width(Length::Fill),
-        ]
-        .spacing(8)
-        .align_y(iced::Alignment::Center),
-    ]
-    .spacing(10))
-    .padding([12, 16])
+                refresh_button,
+                upload_button,
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_y(Length::Fill),
+    )
+    .padding([8, 16])
+    .height(Length::Fixed(styles::workspace_header_height()))
     .style(styles::title_bar);
 
     // --- File entries (hierarchical tree) ---
@@ -208,29 +216,34 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 
     // --- Footer: connected status ---
     let footer = container(
-        row![
-            container(Space::new().width(6).height(6)).style(|_theme: &iced::Theme| container::Style {
-                background: Some(iced::Background::Color(styles::emerald_400())),
-                border: iced::Border {
-                    radius: 3.into(),
+        container(
+            row![
+                container(Space::new().width(6).height(6)).style(|_theme: &iced::Theme| container::Style {
+                    background: Some(iced::Background::Color(styles::emerald_400())),
+                    border: iced::Border {
+                        radius: 3.into(),
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                ..Default::default()
-            }),
-            column![
-                text("Remote explorer")
-                    .size(10)
-                    .color(styles::text_slate_500()),
-                text(latency_label(state.workspace.latency_ms))
-                    .size(11)
-                    .color(styles::text_slate_400()),
+                }),
+                column![
+                    text("Remote explorer")
+                        .size(10)
+                        .color(styles::text_slate_500()),
+                    text(latency_label(state.workspace.latency_ms))
+                        .size(11)
+                        .color(styles::text_slate_400()),
+                ]
+                .spacing(2),
             ]
-            .spacing(2),
-        ]
-        .spacing(8)
-        .align_y(iced::Alignment::Center),
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_y(Length::Fill),
     )
-    .padding([10, 16])
+    .padding([8, 16])
+    .height(Length::Fixed(styles::workspace_footer_height()))
     .width(Length::Fill)
     .style(styles::status_bar);
 
@@ -739,6 +752,12 @@ mod tests {
     fn formats_latency_label_without_zero_placeholder() {
         assert_eq!(super::latency_label(None), "Connected");
         assert_eq!(super::latency_label(Some(42)), "Connected \u{00B7} 42 ms");
+    }
+
+    #[test]
+    fn explorer_chrome_uses_shared_workspace_heights() {
+        assert_eq!(super::styles::workspace_header_height(), 56.0);
+        assert_eq!(super::styles::workspace_footer_height(), 40.0);
     }
 
     #[test]

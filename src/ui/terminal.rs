@@ -108,23 +108,28 @@ fn workspace_tab_bar(state: &AppState) -> Element<'_, Message> {
     );
 
     container(
-        row![
-            tabs,
-            Space::new().width(Length::Fill),
-            column![
-                text("ACTIVE SESSION")
-                    .size(10)
-                    .color(styles::text_slate_500()),
-                text(connected_peer)
-                    .size(12)
-                    .color(styles::text_slate_300()),
+        container(
+            row![
+                tabs,
+                Space::new().width(Length::Fill),
+                column![
+                    text("ACTIVE SESSION")
+                        .size(10)
+                        .color(styles::text_slate_500()),
+                    text(connected_peer)
+                        .size(12)
+                        .color(styles::text_slate_300()),
+                ]
+                .spacing(2)
+                .align_x(iced::Alignment::End),
             ]
-            .spacing(2)
-            .align_x(iced::Alignment::End),
-        ]
-        .align_y(iced::Alignment::Center),
+            .align_y(iced::Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_y(Length::Fill),
     )
     .padding([8, 16])
+    .height(Length::Fixed(styles::workspace_header_height()))
     .width(Length::Fill)
     .style(styles::terminal_header)
     .into()
@@ -194,52 +199,57 @@ fn terminal_panel(state: &AppState) -> Element<'_, Message> {
     };
 
     let status_bar = container(
-        row![
+        container(
             row![
-                container(Space::new().width(5).height(5)).style(|_theme: &iced::Theme| container::Style {
-                    background: Some(iced::Background::Color(styles::primary())),
-                    border: iced::Border {
-                        radius: 3.into(),
+                row![
+                    container(Space::new().width(5).height(5)).style(|_theme: &iced::Theme| container::Style {
+                        background: Some(iced::Background::Color(styles::primary())),
+                        border: iced::Border {
+                            radius: 3.into(),
+                            ..Default::default()
+                        },
                         ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-                text("Live shell")
-                    .size(11)
-                    .color(styles::text_slate_300()),
-                text("UTF-8")
-                    .size(11)
-                    .color(styles::text_slate_500()),
-                text("SSHv2")
-                    .size(11)
-                    .color(styles::text_slate_500()),
-            ]
-            .spacing(12)
-            .align_y(iced::Alignment::Center),
-            Space::new().width(Length::Fill),
-            row![
-                button(text("Clear").size(11).color(styles::text_slate_500()))
-                    .on_press(Message::ClearTerminal)
-                    .padding([4, 8])
-                    .style(styles::status_bar_button),
-                button(text("Scrollback").size(11).color(styles::text_slate_500()))
-                    .on_press(Message::CopyTerminalOutput)
-                    .padding([4, 8])
-                    .style(styles::status_bar_button),
-                button(
-                    text("New Session")
+                    }),
+                    text("Live shell")
                         .size(11)
-                        .color(styles::primary()),
-                )
-                .on_press(Message::DisconnectPressed)
-                .padding([4, 8])
-                .style(styles::new_session_button),
+                        .color(styles::text_slate_300()),
+                    text("UTF-8")
+                        .size(11)
+                        .color(styles::text_slate_500()),
+                    text("SSHv2")
+                        .size(11)
+                        .color(styles::text_slate_500()),
+                ]
+                .spacing(12)
+                .align_y(iced::Alignment::Center),
+                Space::new().width(Length::Fill),
+                row![
+                    button(text("Clear").size(11).color(styles::text_slate_500()))
+                        .on_press(Message::ClearTerminal)
+                        .padding([4, 8])
+                        .style(styles::status_bar_button),
+                    button(text("Scrollback").size(11).color(styles::text_slate_500()))
+                        .on_press(Message::CopyTerminalOutput)
+                        .padding([4, 8])
+                        .style(styles::status_bar_button),
+                    button(
+                        text("New Session")
+                            .size(11)
+                            .color(styles::primary()),
+                    )
+                    .on_press(Message::DisconnectPressed)
+                    .padding([4, 8])
+                    .style(styles::new_session_button),
+                ]
+                .spacing(12),
             ]
-            .spacing(12),
-        ]
-        .align_y(iced::Alignment::Center),
+            .align_y(iced::Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_y(Length::Fill),
     )
     .padding([8, 16])
+    .height(Length::Fixed(styles::workspace_footer_height()))
     .width(Length::Fill)
     .style(styles::status_bar);
 
