@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use iced::widget::text_editor;
+use iced::widget::{markdown, text_editor};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorLanguage {
@@ -110,6 +110,8 @@ pub struct EditorDocument {
     pub is_saving: bool,
     pub is_dirty: bool,
     pub load_error: Option<String>,
+    pub markdown_preview: bool,
+    pub markdown_items: Vec<markdown::Item>,
 }
 
 impl EditorDocument {
@@ -127,10 +129,15 @@ impl EditorDocument {
             is_saving: false,
             is_dirty: false,
             load_error: None,
+            markdown_preview: false,
+            markdown_items: Vec::new(),
         }
     }
 
     pub fn apply_content(&mut self, content: String) {
+        if self.language == EditorLanguage::Markdown {
+            self.markdown_items = markdown::parse(&content).collect();
+        }
         self.buffer = text_editor::Content::with_text(&content);
         self.saved_content = content;
         self.is_loading = false;

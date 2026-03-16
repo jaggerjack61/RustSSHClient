@@ -72,4 +72,6 @@ pub enum Message {
     ConfirmFileAction,
     CancelFileAction,
     DismissNotification(usize),
+    ToggleMarkdownPreview,
+    MarkdownLinkClicked(String),
 }

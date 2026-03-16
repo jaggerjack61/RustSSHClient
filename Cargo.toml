@@ -10,7 +10,7 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["clock", "serde"] }
 crossbeam-channel = "0.5"
 directories = "5"
-iced = { version = "0.14", features = ["tokio", "highlighter"] }
+iced = { version = "0.14", features = ["tokio", "highlighter", "markdown"] }
 keyring = "3"
 rand = "0.8"
 rfd = "0.15"

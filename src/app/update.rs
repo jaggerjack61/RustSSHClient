@@ -648,6 +648,20 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             }
             Task::none()
         }
+        Message::ToggleMarkdownPreview => {
+            if let Some(editor) = state.active_editor_mut() {
+                editor.markdown_preview = !editor.markdown_preview;
+                if editor.markdown_preview {
+                    let text = editor.current_text();
+                    editor.markdown_items = iced::widget::markdown::parse(&text).collect();
+                }
+            }
+            Task::none()
+        }
+        Message::MarkdownLinkClicked(url) => {
+            let _ = webbrowser::open(&url);
+            Task::none()
+        }
     }
 }
 

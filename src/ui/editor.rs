@@ -1,9 +1,9 @@
-use iced::widget::{button, column, container, row, text, text_editor, Space};
-use iced::{Color, Element, Length};
+use iced::widget::{button, column, container, markdown, row, scrollable, text, text_editor, Space};
+use iced::{Color, Element, Length, Theme};
 
 use crate::app::messages::Message;
 use crate::app::state::AppState;
-use crate::models::EditorDocument;
+use crate::models::{EditorDocument, EditorLanguage};
 
 use super::styles;
 
@@ -34,7 +34,40 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         styles::emerald_400()
     };
 
-    let header = container(
+    let is_markdown = document.language == EditorLanguage::Markdown;
+
+    let save_button = button(
+        text(if document.is_saving { "Saving" } else { "Save" })
+            .size(12)
+            .color(if document.is_saving {
+                styles::text_slate_500()
+            } else {
+                Color::WHITE
+            }),
+    )
+    .on_press_maybe(can_save.then_some(Message::SaveActiveEditor))
+    .padding([6, 14])
+    .style(if can_save {
+        styles::primary_button
+    } else {
+        styles::ghost_button
+    });
+
+    let header_row: Element<'_, Message> = if is_markdown {
+        let preview_label = if document.markdown_preview { "Edit" } else { "Preview" };
+        let preview_button = button(
+            text(preview_label)
+                .size(12)
+                .color(Color::WHITE),
+        )
+        .on_press(Message::ToggleMarkdownPreview)
+        .padding([6, 14])
+        .style(if document.markdown_preview {
+            styles::primary_button
+        } else {
+            styles::ghost_button
+        });
+
         row![
             column![
                 text(&document.title).size(14).color(Color::WHITE),
@@ -56,29 +89,45 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
             ]
             .spacing(2)
             .align_x(iced::Alignment::End),
-            button(
-                text(if document.is_saving { "Saving" } else { "Save" })
-                    .size(12)
-                    .color(if document.is_saving {
-                        styles::text_slate_500()
-                    } else {
-                        Color::WHITE
-                    }),
-            )
-            .on_press_maybe(can_save.then_some(Message::SaveActiveEditor))
-            .padding([6, 14])
-            .style(if can_save {
-                styles::primary_button
-            } else {
-                styles::ghost_button
-            }),
+            preview_button,
+            save_button,
         ]
         .spacing(12)
-        .align_y(iced::Alignment::Center),
-    )
-    .padding([10, 16])
-    .width(Length::Fill)
-    .style(styles::editor_header);
+        .align_y(iced::Alignment::Center)
+        .into()
+    } else {
+        row![
+            column![
+                text(&document.title).size(14).color(Color::WHITE),
+                text(&document.path)
+                    .size(11)
+                    .color(styles::text_slate_500())
+                    .width(Length::Fill),
+            ]
+            .spacing(3)
+            .width(Length::FillPortion(3)),
+            Space::new().width(Length::Fill),
+            column![
+                text(status_text)
+                    .size(11)
+                    .color(status_color),
+                text(document.language.label())
+                    .size(11)
+                    .color(styles::blue_400()),
+            ]
+            .spacing(2)
+            .align_x(iced::Alignment::End),
+            save_button,
+        ]
+        .spacing(12)
+        .align_y(iced::Alignment::Center)
+        .into()
+    };
+
+    let header = container(header_row)
+        .padding([10, 16])
+        .width(Length::Fill)
+        .style(styles::editor_header);
 
     let body: Element<'_, Message> = if document.is_loading {
         container(text("Loading remote file...").color(styles::text_slate_400()))
@@ -102,6 +151,27 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         .width(Length::Fill)
         .height(Length::Fill)
         .center_y(Length::Fill)
+        .style(styles::terminal_area)
+        .into()
+    } else if document.markdown_preview {
+        let preview = markdown::view(
+            &document.markdown_items,
+            markdown::Settings::with_style(Theme::Dark),
+        )
+        .map(|url| Message::MarkdownLinkClicked(url.to_string()));
+
+        container(
+            scrollable(
+                container(preview)
+                    .padding([16, 24])
+                    .width(Length::Fill),
+            )
+            .style(styles::dark_scrollable)
+            .width(Length::Fill)
+            .height(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
         .style(styles::terminal_area)
         .into()
     } else {
