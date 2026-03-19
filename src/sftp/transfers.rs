@@ -1,4 +1,4 @@
-use crate::models::{TransferProgress, TransferStatus};
+use crate::models::TransferProgress;
 
 pub fn merge_transfer(update: &TransferProgress, transfers: &mut Vec<TransferProgress>) {
     if let Some(existing) = transfers.iter_mut().find(|item| item.id == update.id) {
@@ -8,7 +8,6 @@ pub fn merge_transfer(update: &TransferProgress, transfers: &mut Vec<TransferPro
     }
 
     transfers.sort_by(|left, right| right.label.cmp(&left.label));
-    transfers.retain(|item| !matches!(item.status, TransferStatus::Completed));
 }
 
 #[cfg(test)]
@@ -23,6 +22,7 @@ mod tests {
 
         super::merge_transfer(&completed, &mut transfers);
 
-        assert!(transfers.is_empty());
+        assert_eq!(transfers.len(), 1);
+        assert!(matches!(transfers[0].status, TransferStatus::Completed));
     }
 }

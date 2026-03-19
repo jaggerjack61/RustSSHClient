@@ -19,6 +19,8 @@ pub fn parse_cd_command(current_directory: &str, command: &str) -> Option<Direct
         return Some(DirectoryHint::ResolveHome);
     }
 
+    let target = strip_shell_quotes(target);
+
     // Strip trailing shell operators so that compound commands like
     // `cd /tmp && ls` don't pollute the target path.
     let target = strip_shell_suffix(target);
@@ -38,10 +40,41 @@ pub fn parse_cd_command(current_directory: &str, command: &str) -> Option<Direct
         return Some(DirectoryHint::HomeRelative(sub.to_string()));
     }
 
+    if target == "$HOME" || target == "${HOME}" {
+        return Some(DirectoryHint::ResolveHome);
+    }
+    if let Some(sub) = target.strip_prefix("$HOME/") {
+        let sub = sub.trim_start_matches('/');
+        if sub.is_empty() {
+            return Some(DirectoryHint::ResolveHome);
+        }
+        return Some(DirectoryHint::HomeRelative(sub.to_string()));
+    }
+    if let Some(sub) = target.strip_prefix("${HOME}/") {
+        let sub = sub.trim_start_matches('/');
+        if sub.is_empty() {
+            return Some(DirectoryHint::ResolveHome);
+        }
+        return Some(DirectoryHint::HomeRelative(sub.to_string()));
+    }
+
     Some(DirectoryHint::Absolute(normalize_remote_path(
         current_directory,
         target,
     )))
+}
+
+fn strip_shell_quotes(target: &str) -> &str {
+    let bytes = target.as_bytes();
+    if bytes.len() >= 2 {
+        let first = bytes[0];
+        let last = bytes[bytes.len() - 1];
+        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
+            return &target[1..target.len() - 1];
+        }
+    }
+
+    target
 }
 
 fn strip_shell_suffix(target: &str) -> &str {

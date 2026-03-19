@@ -3,6 +3,7 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use zeroize::Zeroize;
 
 use crate::error::{AppError, AppResult};
 
@@ -236,6 +237,14 @@ impl LoginRequest {
 
     pub fn socket_address(&self) -> String {
         format!("{}:{}", self.host.trim(), self.port)
+    }
+}
+
+impl Drop for LoginRequest {
+    fn drop(&mut self) {
+        if let Some(password) = &mut self.password {
+            password.zeroize();
+        }
     }
 }
 

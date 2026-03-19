@@ -1,5 +1,6 @@
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,9 @@ use crate::models::{
 use crate::sftp::client as sftp_client;
 use crate::ssh::client;
 
+const MAX_CONCURRENT_TRANSFER_WORKERS: usize = 4;
+static ACTIVE_TRANSFER_WORKERS: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SessionCommand {
     SendInput(Vec<u8>),
@@ -24,6 +28,10 @@ pub enum SessionCommand {
     WriteFile {
         remote_path: String,
         contents: String,
+    },
+    ResizeTerminal {
+        cols: u32,
+        rows: u32,
     },
     Upload {
         local_paths: Vec<PathBuf>,
@@ -256,6 +264,9 @@ fn run_session(
                         }
                     }
                 }
+                SessionCommand::ResizeTerminal { cols, rows } => {
+                    shell.request_pty_size(cols, rows, None, None)?;
+                }
                 SessionCommand::Upload {
                     local_paths,
                     remote_directory,
@@ -424,7 +435,30 @@ fn spawn_transfer_worker<F>(
         + Send
         + 'static,
 {
+    let acquired = ACTIVE_TRANSFER_WORKERS
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+            (count < MAX_CONCURRENT_TRANSFER_WORKERS).then_some(count + 1)
+        })
+        .is_ok();
+
+    if !acquired {
+        let _ = event_tx.send(SessionEvent::Error(format!(
+            "Too many concurrent transfers. The limit is {}.",
+            MAX_CONCURRENT_TRANSFER_WORKERS
+        )));
+        return;
+    }
+
     thread::spawn(move || {
+        struct WorkerGuard;
+
+        impl Drop for WorkerGuard {
+            fn drop(&mut self) {
+                ACTIVE_TRANSFER_WORKERS.fetch_sub(1, Ordering::AcqRel);
+            }
+        }
+
+        let _guard = WorkerGuard;
         let mut transfer = sftp_client::queued_transfer(label, direction, 0);
         let _ = event_tx.send(SessionEvent::Transfer(transfer.clone()));
 

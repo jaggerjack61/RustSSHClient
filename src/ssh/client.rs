@@ -81,7 +81,9 @@ pub fn connect_session(request: &LoginRequest, key: Option<&SshKeyRecord>) -> Ap
 pub fn resolve_home_directory(session: &Session) -> AppResult<String> {
     let sftp = session.sftp()?;
     let home = sftp.realpath(Path::new("."))?;
-    Ok(home.to_string_lossy().replace('\\', "/"))
+    home.to_str()
+        .map(|value| value.replace('\\', "/"))
+        .ok_or_else(|| AppError::Ssh("Remote home directory contains non-UTF-8 text.".into()))
 }
 
 fn authenticate(

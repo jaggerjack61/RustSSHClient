@@ -12,14 +12,17 @@ use crate::sftp::file_tree::{DirectoryHint, collapse_segments, normalize_remote_
 use crate::sftp::transfers::merge_transfer;
 use crate::ssh::session::{SessionCommand, SessionEvent};
 use crate::ssh::terminal;
+use crate::ui::styles;
 
 const TERMINAL_CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(530);
+const MAX_SESSION_EVENTS_PER_TICK: usize = 64;
 const PROJECT_URL: &str = "https://github.com/jaggerjack61/RustSSHClient";
 const KEY_MANAGER_COMING_SOON_MESSAGE: &str = "Key Manager is coming soon.";
 
 pub fn subscription(_state: &AppState) -> Subscription<Message> {
     Subscription::batch(vec![
         time::every(Duration::from_millis(33)).map(Message::Tick),
+        window::resize_events().map(|(_, size)| Message::WindowResized(size.width, size.height)),
         event::listen().map(Message::RuntimeEvent),
     ])
 }
@@ -98,48 +101,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::ConnectPressed => {
-            let request = match state.prepare_login_request() {
-                Ok(request) => request,
-                Err(error) => {
-                    state.notification(NotificationLevel::Error, error);
-                    return Task::none();
-                }
-            };
-
-            let key = state.selected_key().cloned();
-            state.login.connecting = true;
-            let saved_host = if request.save_host {
-                let mut host = state
-                    .login
-                    .editing_host_id
-                    .and_then(|id| state.hosts.iter().find(|host| host.id == id).cloned())
-                    .unwrap_or_else(|| HostRecord::new(&request));
-                host.apply_request(&request);
-                Some(host)
-            } else {
-                None
-            };
-
-            if let Some(host) = saved_host {
-                upsert_host(state, host);
-                return Task::batch([
-                    persist_snapshot(state),
-                    Task::perform(
-                        async move {
-                            crate::ssh::session::spawn(request, key)
-                                .map_err(|error| error.to_string())
-                        },
-                        Message::SessionSpawned,
-                    ),
-                ]);
-            }
-
-            Task::perform(
-                async move {
-                    crate::ssh::session::spawn(request, key).map_err(|error| error.to_string())
-                },
-                Message::SessionSpawned,
-            )
+            begin_connect(state)
         }
         Message::SessionSpawned(result) => {
             state.login.connecting = false;
@@ -174,7 +136,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             }
 
             if clicked_twice {
-                update(state, Message::ConnectPressed)
+                begin_connect(state)
             } else {
                 Task::none()
             }
@@ -233,6 +195,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
 
             drain_session_events(state)
         }
+        Message::WindowResized(width, height) => apply_terminal_resize(state, width, height),
         Message::RuntimeEvent(event) => match event {
             Event::Window(window::Event::FileDropped(path)) => {
                 if state.workspace.session.is_some() {
@@ -242,7 +205,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                         .map(|entry| entry.path.clone())
                         .unwrap_or_else(|| state.workspace.current_directory.clone());
 
-                    let _ = send_session_command(
+                    send_session_command(
                         state,
                         SessionCommand::Upload {
                             local_paths: vec![path],
@@ -265,7 +228,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 if modifiers.control() && !modifiers.shift() {
                     if let Key::Character(ref ch) = key {
                         if ch.as_str().eq_ignore_ascii_case("s") {
-                            return update(state, Message::SaveActiveEditor);
+                            return save_active_editor(state);
                         }
                     }
                 }
@@ -278,7 +241,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 if modifiers.control() && modifiers.shift() {
                     if let Key::Character(ref ch) = key {
                         if ch.as_str().eq_ignore_ascii_case("c") {
-                            return update(state, Message::CopyTerminalOutput);
+                            return copy_terminal_output(state);
                         }
                     }
                 }
@@ -301,16 +264,16 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                     {
                         match hint {
                             DirectoryHint::ResolveHome => {
-                                let _ = request_directory_refresh(state, None);
+                                request_directory_refresh(state, None);
                             }
                             DirectoryHint::HomeRelative(sub) => {
-                                let _ = request_directory_refresh(
+                                request_directory_refresh(
                                     state,
                                     Some(format!("~/{sub}")),
                                 );
                             }
                             DirectoryHint::Absolute(path) => {
-                                let _ = request_directory_refresh(state, Some(path));
+                                request_directory_refresh(state, Some(path));
                             }
                         }
                     }
@@ -320,10 +283,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 if let Some(bytes) =
                     terminal::key_to_bytes(&key, modifiers, text.as_deref())
                 {
-                    let _ = send_session_command(
-                        state,
-                        SessionCommand::SendInput(bytes),
-                    );
+                    send_session_command(state, SessionCommand::SendInput(bytes));
                 }
                 Task::none()
             }
@@ -334,12 +294,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::CopyTerminalOutput => {
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                if let Err(error) = clipboard.set_text(state.workspace.terminal.display_text()) {
-                    state.notification(NotificationLevel::Error, error.to_string());
-                }
-            }
-            Task::none()
+            copy_terminal_output(state)
         }
         Message::PasteTerminalInput => handle_terminal_paste(state),
         Message::DisconnectPressed => {
@@ -351,7 +306,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::RefreshDirectory => {
             state.workspace.explorer_context_for = None;
             state.workspace.show_properties = false;
-            let _ = request_directory_refresh(
+            request_directory_refresh(
                 state,
                 Some(state.workspace.current_directory.clone()),
             );
@@ -362,7 +317,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.workspace.show_properties = false;
             let parent = parent_directory(&state.workspace.current_directory);
             if parent != state.workspace.current_directory {
-                let _ = request_directory_refresh(state, Some(parent));
+                request_directory_refresh(state, Some(parent));
             }
             Task::none()
         }
@@ -387,7 +342,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                         state.workspace.expanded_folders.insert(path);
                     } else {
                         state.workspace.expanded_folders.insert(path.clone());
-                        let _ = request_directory_children(state, path);
+                        request_directory_children(state, path);
                     }
                 }
             }
@@ -405,9 +360,9 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 .map(|entry| entry.is_directory())
             {
                 if is_directory {
-                    let _ = request_directory_refresh(state, Some(path));
+                    request_directory_refresh(state, Some(path));
                 } else {
-                    return update(state, Message::OpenSelectedFileInEditor);
+                    return open_selected_file_in_editor(state);
                 }
             }
             Task::none()
@@ -435,72 +390,14 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::OpenSelectedFileInEditor => {
-            state.workspace.explorer_context_for = None;
-
-            let Some(selected) = state.selected_file().cloned() else {
-                state.notification(
-                    NotificationLevel::Info,
-                    "Select a remote file first.",
-                );
-                return Task::none();
-            };
-
-            if selected.is_directory() {
-                state.notification(
-                    NotificationLevel::Info,
-                    "Folders cannot be opened in the editor.",
-                );
-                return Task::none();
-            }
-
-            state.workspace.open_editor_tab(selected.path.clone());
-
-            if !send_session_command(
-                state,
-                SessionCommand::ReadFile {
-                    remote_path: selected.path.clone(),
-                },
-            ) {
-                state.workspace.fail_editor_load(
-                    &selected.path,
-                    "Unable to request the remote file contents.".into(),
-                );
-            }
-
-            Task::none()
+            open_selected_file_in_editor(state)
         }
         Message::EditorAction(path, action) => {
             state.workspace.apply_editor_action(&path, action);
             Task::none()
         }
         Message::SaveActiveEditor => {
-            let Some(editor) = state.active_editor() else {
-                return Task::none();
-            };
-
-            if editor.is_loading || editor.load_error.is_some() || !editor.is_dirty || editor.is_saving {
-                return Task::none();
-            }
-
-            let path = editor.path.clone();
-            let contents = editor.current_text();
-            state.workspace.mark_editor_saving(&path);
-
-            if !send_session_command(
-                state,
-                SessionCommand::WriteFile {
-                    remote_path: path.clone(),
-                    contents,
-                },
-            ) {
-                state.workspace.mark_editor_save_failed(&path);
-                state.notification(
-                    NotificationLevel::Error,
-                    format!("Unable to save remote file {path}."),
-                );
-            }
-
-            Task::none()
+            save_active_editor(state)
         }
         Message::ActivateTerminalTab => {
             state.workspace.active_tab = WorkspaceTab::Terminal;
@@ -518,8 +415,10 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
         Message::UploadRequested => {
             state.workspace.explorer_context_for = None;
-            let files = rfd::FileDialog::new().pick_files();
-            update(state, Message::FilesSelected(files))
+            Task::perform(
+                async move { rfd::FileDialog::new().pick_files() },
+                Message::FilesSelected,
+            )
         }
         Message::FilesSelected(files) => {
             if let Some(paths) = files {
@@ -529,7 +428,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                     .map(|entry| entry.path.clone())
                     .unwrap_or_else(|| state.workspace.current_directory.clone());
 
-                let _ = send_session_command(
+                send_session_command(
                     state,
                     SessionCommand::Upload {
                         local_paths: paths,
@@ -541,16 +440,25 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
         Message::DownloadRequested => {
             state.workspace.explorer_context_for = None;
-            let Some(selected) = state.selected_file().cloned() else {
+            let Some(_) = state.selected_file().cloned() else {
                 state.notification(
                     NotificationLevel::Info,
                     "Select a remote file or folder first.",
                 );
                 return Task::none();
             };
+            Task::perform(
+                async move { rfd::FileDialog::new().pick_folder() },
+                Message::DownloadDirectorySelected,
+            )
+        }
+        Message::DownloadDirectorySelected(local_directory) => {
+            if let Some(local_directory) = local_directory {
+                let Some(selected) = state.selected_file().cloned() else {
+                    return Task::none();
+                };
 
-            if let Some(local_directory) = rfd::FileDialog::new().pick_folder() {
-                let _ = send_session_command(
+                send_session_command(
                     state,
                     SessionCommand::Download {
                         remote_path: selected.path,
@@ -692,12 +600,18 @@ fn import_key_dialog() -> Result<Option<crate::models::SshKeyRecord>, String> {
 }
 
 fn drain_session_events(state: &mut AppState) -> Task<Message> {
-    while let Some(event) = state
-        .workspace
-        .session
-        .as_ref()
-        .and_then(|session| session.try_recv())
-    {
+    let mut processed = 0;
+    while processed < MAX_SESSION_EVENTS_PER_TICK {
+        let Some(event) = state
+            .workspace
+            .session
+            .as_ref()
+            .and_then(|session| session.try_recv())
+        else {
+            break;
+        };
+
+        processed += 1;
         match event {
             SessionEvent::Connected {
                 cwd,
@@ -711,6 +625,9 @@ fn drain_session_events(state: &mut AppState) -> Task<Message> {
                 state.workspace.connected_peer = peer;
                 state.workspace.latency_ms = Some(latency_ms);
                 state.notification(NotificationLevel::Success, "SSH session established.");
+                if let Some((width, height)) = state.workspace.window_size {
+                    let _ = apply_terminal_resize(state, width, height);
+                }
             }
             SessionEvent::Output(bytes) => {
                 state.workspace.terminal.feed(&bytes);
@@ -922,15 +839,155 @@ fn handle_terminal_paste(state: &mut AppState) -> Task<Message> {
     match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_text()) {
         Ok(text) => {
             if !text.is_empty() {
-                let _ = send_session_command(
-                    state,
-                    SessionCommand::SendInput(text.into_bytes()),
-                );
+                send_session_command(state, SessionCommand::SendInput(text.into_bytes()));
             }
         }
         Err(error) => state.notification(NotificationLevel::Error, error.to_string()),
     }
     Task::none()
+}
+
+fn begin_connect(state: &mut AppState) -> Task<Message> {
+    let request = match state.prepare_login_request() {
+        Ok(request) => request,
+        Err(error) => {
+            state.notification(NotificationLevel::Error, error);
+            return Task::none();
+        }
+    };
+
+    let key = state.selected_key().cloned();
+    state.login.connecting = true;
+    let saved_host = if request.save_host {
+        let mut host = state
+            .login
+            .editing_host_id
+            .and_then(|id| state.hosts.iter().find(|host| host.id == id).cloned())
+            .unwrap_or_else(|| HostRecord::new(&request));
+        host.apply_request(&request);
+        Some(host)
+    } else {
+        None
+    };
+
+    if let Some(host) = saved_host {
+        upsert_host(state, host);
+        return Task::batch([
+            persist_snapshot(state),
+            Task::perform(
+                async move {
+                    crate::ssh::session::spawn(request, key).map_err(|error| error.to_string())
+                },
+                Message::SessionSpawned,
+            ),
+        ]);
+    }
+
+    Task::perform(
+        async move { crate::ssh::session::spawn(request, key).map_err(|error| error.to_string()) },
+        Message::SessionSpawned,
+    )
+}
+
+fn open_selected_file_in_editor(state: &mut AppState) -> Task<Message> {
+    state.workspace.explorer_context_for = None;
+
+    let Some(selected) = state.selected_file().cloned() else {
+        state.notification(NotificationLevel::Info, "Select a remote file first.");
+        return Task::none();
+    };
+
+    if selected.is_directory() {
+        state.notification(NotificationLevel::Info, "Folders cannot be opened in the editor.");
+        return Task::none();
+    }
+
+    state.workspace.open_editor_tab(selected.path.clone());
+
+    if !send_session_command(
+        state,
+        SessionCommand::ReadFile {
+            remote_path: selected.path.clone(),
+        },
+    ) {
+        state.workspace.fail_editor_load(
+            &selected.path,
+            "Unable to request the remote file contents.".into(),
+        );
+    }
+
+    Task::none()
+}
+
+fn save_active_editor(state: &mut AppState) -> Task<Message> {
+    let Some(editor) = state.active_editor() else {
+        return Task::none();
+    };
+
+    if editor.is_loading || editor.load_error.is_some() || !editor.is_dirty || editor.is_saving {
+        return Task::none();
+    }
+
+    let path = editor.path.clone();
+    let contents = editor.current_text();
+    state.workspace.mark_editor_saving(&path);
+
+    if !send_session_command(
+        state,
+        SessionCommand::WriteFile {
+            remote_path: path.clone(),
+            contents,
+        },
+    ) {
+        state.workspace.mark_editor_save_failed(&path);
+        state.notification(
+            NotificationLevel::Error,
+            format!("Unable to save remote file {path}."),
+        );
+    }
+
+    Task::none()
+}
+
+fn copy_terminal_output(state: &mut AppState) -> Task<Message> {
+    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+        if let Err(error) = clipboard.set_text(state.workspace.terminal.display_text()) {
+            state.notification(NotificationLevel::Error, error.to_string());
+        }
+    }
+
+    Task::none()
+}
+
+fn apply_terminal_resize(state: &mut AppState, width: f32, height: f32) -> Task<Message> {
+    state.workspace.window_size = Some((width, height));
+
+    let (cols, rows) = terminal_geometry_from_window(width, height);
+    state.workspace.terminal.resize(rows as u16, cols as u16);
+
+    if !send_session_command(state, SessionCommand::ResizeTerminal { cols, rows }) {
+        // No active session yet; keep the local terminal buffer resized.
+    }
+
+    Task::none()
+}
+
+fn terminal_geometry_from_window(width: f32, height: f32) -> (u32, u32) {
+    let sidebar_width = 260.0_f32;
+    let terminal_padding_width = 42.0_f32;
+    let terminal_padding_height = 42.0_f32;
+    let tab_bar_height = styles::workspace_header_height();
+    let footer_height = styles::workspace_footer_height();
+    let transfer_allowance = 72.0_f32;
+
+    let available_width = (width - sidebar_width - terminal_padding_width).max(320.0);
+    let available_height = (height - tab_bar_height - footer_height - terminal_padding_height - transfer_allowance)
+        .max(180.0);
+
+    let cols = (available_width / 8.0).floor().clamp(20.0, 240.0) as u32;
+    let rows = (available_height / 18.0).floor().clamp(8.0, 120.0) as u32;
+
+    (cols, rows)
 }
 
 fn open_project_link() -> Result<(), String> {

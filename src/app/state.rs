@@ -1,6 +1,9 @@
 use std::collections::HashSet;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::time::{Duration, Instant};
 
+use chrono::Utc;
 use iced::Task;
 use uuid::Uuid;
 
@@ -12,6 +15,9 @@ use crate::models::{
 use crate::ssh::session::SessionHandle;
 use crate::ssh::terminal::TerminalBuffer;
 use crate::storage::{StorageFacade, StorageSnapshot};
+
+const MAX_NOTIFICATIONS: usize = 8;
+const NOTIFICATION_TTL: Duration = Duration::from_secs(12);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Route {
@@ -92,6 +98,7 @@ pub struct WorkspaceState {
     pub loaded_folders: HashSet<String>,
     pub loading_folders: HashSet<String>,
     pub show_properties: bool,
+    pub window_size: Option<(f32, f32)>,
     pub terminal_cursor_visible: bool,
     pub last_terminal_cursor_toggle: Instant,
 }
@@ -117,6 +124,7 @@ impl Default for WorkspaceState {
             loaded_folders: HashSet::new(),
             loading_folders: HashSet::new(),
             show_properties: false,
+            window_size: None,
             terminal_cursor_visible: true,
             last_terminal_cursor_toggle: Instant::now(),
         }
@@ -170,19 +178,36 @@ impl AppState {
     }
 
     pub fn notification(&mut self, level: NotificationLevel, message: impl Into<String>) {
+        let message = message.into();
         self.notifications.push(Notification {
             level,
-            message: message.into(),
+            message: message.clone(),
             created_at: Instant::now(),
         });
-        if self.notifications.len() > 4 {
+        if self.notifications.len() > MAX_NOTIFICATIONS {
             self.notifications.remove(0);
         }
+
+        let _ = self.append_notification_log(level, &message);
     }
 
     pub fn prune_notifications(&mut self) {
         self.notifications
-            .retain(|item| item.created_at.elapsed() < Duration::from_secs(8));
+            .retain(|item| item.created_at.elapsed() < NOTIFICATION_TTL);
+    }
+
+    fn append_notification_log(
+        &self,
+        level: NotificationLevel,
+        message: &str,
+    ) -> std::io::Result<()> {
+        let log_path = self.storage.root().join("notifications.log");
+        let mut log = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)?;
+        writeln!(log, "{} [{level:?}] {message}", Utc::now().to_rfc3339())?;
+        Ok(())
     }
 
     pub fn selected_key(&self) -> Option<&SshKeyRecord> {

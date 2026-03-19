@@ -3,6 +3,7 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use zeroize::Zeroize;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SshKeyRecord {
@@ -20,6 +21,12 @@ impl fmt::Debug for SshKeyRecord {
             .field("pem_contents", &"<redacted>")
             .field("created_at", &self.created_at)
             .finish()
+    }
+}
+
+impl Drop for SshKeyRecord {
+    fn drop(&mut self) {
+        self.pem_contents.zeroize();
     }
 }
 

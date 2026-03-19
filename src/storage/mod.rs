@@ -2,19 +2,23 @@ pub mod credentials;
 pub mod crypto;
 pub mod keys;
 
+use std::fs;
 use std::path::PathBuf;
 
 use chrono::Utc;
 use directories::ProjectDirs;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::models::{HostRecord, SshKeyRecord};
+use crate::storage::crypto::EncryptedJsonStore;
 
 pub const APP_QUALIFIER: &str = "com";
 pub const APP_ORGANIZATION: &str = "RustSSH";
 pub const APP_NAME: &str = "RustSSHClient";
+const SNAPSHOT_FILE: &str = "snapshot.vault";
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StorageSnapshot {
     pub hosts: Vec<HostRecord>,
     pub keys: Vec<SshKeyRecord>,
@@ -43,6 +47,11 @@ impl StorageFacade {
     }
 
     pub fn load_snapshot(&self) -> AppResult<StorageSnapshot> {
+        let snapshot_store = EncryptedJsonStore::new(self.root.join(SNAPSHOT_FILE));
+        if snapshot_store.path().exists() {
+            return snapshot_store.load_or_default();
+        }
+
         let credentials_store = credentials::CredentialsStore::new(self.root.join("hosts.vault"));
         let mut hosts = credentials_store.load_hosts()?;
         let original_len = hosts.len();
@@ -53,16 +62,25 @@ impl StorageFacade {
             credentials_store.save_hosts(&hosts)?;
         }
 
-        Ok(StorageSnapshot {
+        let snapshot = StorageSnapshot {
             hosts,
             keys: keys::KeyStore::new(self.root.join("keys.vault")).load_keys()?,
-        })
+        };
+
+        if let Err(error) = snapshot_store.save(&snapshot) {
+            eprintln!("warning: unable to migrate snapshot storage: {error}");
+        } else {
+            let _ = fs::remove_file(self.root.join("hosts.vault"));
+            let _ = fs::remove_file(self.root.join("keys.vault"));
+        }
+
+        Ok(snapshot)
     }
 
     pub fn save_snapshot(&self, snapshot: &StorageSnapshot) -> AppResult<()> {
-        credentials::CredentialsStore::new(self.root.join("hosts.vault"))
-            .save_hosts(&snapshot.hosts)?;
-        keys::KeyStore::new(self.root.join("keys.vault")).save_keys(&snapshot.keys)?;
+        EncryptedJsonStore::new(self.root.join(SNAPSHOT_FILE)).save(snapshot)?;
+        let _ = fs::remove_file(self.root.join("hosts.vault"));
+        let _ = fs::remove_file(self.root.join("keys.vault"));
         Ok(())
     }
 
