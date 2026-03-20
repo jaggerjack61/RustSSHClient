@@ -1,3 +1,4 @@
 /target
 .playwright/
 .playwright-mcp/
+issues.md
