@@ -206,23 +206,28 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     };
 
     let footer = container(
-        row![
-            text(format!("{} lines", line_count(document)))
-                .size(11)
-                .color(styles::text_slate_500()),
-            text(format!("{} bytes", document.current_text().len()))
-                .size(11)
-                .color(styles::text_slate_500()),
-            Space::new().width(Length::Fill),
-            text("Ctrl+S to save")
-                .size(11)
-                .color(styles::text_slate_500()),
-        ]
-        .spacing(14)
-        .align_y(iced::Alignment::Center),
+        container(
+            row![
+                text(format!("{} lines", line_count(document)))
+                    .size(11)
+                    .color(styles::text_slate_500()),
+                text(format!("{} bytes", document.current_text().len()))
+                    .size(11)
+                    .color(styles::text_slate_500()),
+                Space::new().width(Length::Fill),
+                text("Ctrl+S to save")
+                    .size(11)
+                    .color(styles::text_slate_500()),
+            ]
+            .spacing(14)
+            .align_y(iced::Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_y(Length::Fill),
     )
     .padding([8, 16])
     .width(Length::Fill)
+    .height(Length::Fixed(styles::workspace_footer_height()))
     .style(styles::status_bar);
 
     column![header, body, footer]
