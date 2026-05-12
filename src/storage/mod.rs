@@ -49,16 +49,16 @@ impl StorageFacade {
     pub fn load_snapshot(&self) -> AppResult<StorageSnapshot> {
         let snapshot_store = EncryptedJsonStore::new(self.root.join(SNAPSHOT_FILE));
         if snapshot_store.path().exists() {
-            return snapshot_store.load_or_default();
+            let mut snapshot: StorageSnapshot = snapshot_store.load_or_default()?;
+            if prune_expired_hosts(&mut snapshot.hosts) {
+                snapshot_store.save(&snapshot)?;
+            }
+            return Ok(snapshot);
         }
 
         let credentials_store = credentials::CredentialsStore::new(self.root.join("hosts.vault"));
         let mut hosts = credentials_store.load_hosts()?;
-        let original_len = hosts.len();
-        let now = Utc::now();
-        hosts.retain(|host| !host.is_expired(now));
-
-        if hosts.len() != original_len {
+        if prune_expired_hosts(&mut hosts) {
             credentials_store.save_hosts(&hosts)?;
         }
 
@@ -87,4 +87,11 @@ impl StorageFacade {
     pub fn ensure_root(&self) -> AppResult<()> {
         std::fs::create_dir_all(&self.root).map_err(AppError::from)
     }
+}
+
+fn prune_expired_hosts(hosts: &mut Vec<HostRecord>) -> bool {
+    let original_len = hosts.len();
+    let now = Utc::now();
+    hosts.retain(|host| !host.is_expired(now));
+    hosts.len() != original_len
 }

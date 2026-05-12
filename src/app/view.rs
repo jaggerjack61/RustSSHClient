@@ -12,8 +12,8 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     };
 
     container(stack([content, ui::styles::notifications(state)]))
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .style(ui::styles::root_container)
-    .into()
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(ui::styles::root_container)
+        .into()
 }

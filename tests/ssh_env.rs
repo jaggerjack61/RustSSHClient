@@ -91,5 +91,9 @@ fn can_expand_a_directory_in_tree_view() {
         sftp_client::list_directory(&sftp, &directory.path).expect("list child directory");
 
     assert!(directory.path.starts_with('/'));
-    assert!(child_entries.iter().all(|entry| entry.path.starts_with(&directory.path)));
+    assert!(
+        child_entries
+            .iter()
+            .all(|entry| entry.path.starts_with(&directory.path))
+    );
 }

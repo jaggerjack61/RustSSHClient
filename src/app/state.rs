@@ -293,10 +293,8 @@ impl AppState {
     pub fn sorted_hosts(&self) -> Vec<HostRecord> {
         let mut hosts = self.hosts.clone();
         match self.host_sort {
-            HostSort::Label => hosts
-                .sort_by(|left, right| left.label.to_lowercase().cmp(&right.label.to_lowercase())),
-            HostSort::Host => hosts
-                .sort_by(|left, right| left.host.to_lowercase().cmp(&right.host.to_lowercase())),
+            HostSort::Label => hosts.sort_by_cached_key(|host| host.label.to_lowercase()),
+            HostSort::Host => hosts.sort_by_cached_key(|host| host.host.to_lowercase()),
             HostSort::Recent => hosts.sort_by(|left, right| right.updated_at.cmp(&left.updated_at)),
         }
         hosts
@@ -318,7 +316,8 @@ impl WorkspaceState {
             return;
         }
 
-        self.editor_tabs.push(EditorDocument::new_loading(path.clone()));
+        self.editor_tabs
+            .push(EditorDocument::new_loading(path.clone()));
         self.active_tab = WorkspaceTab::Editor(path);
     }
 
@@ -346,11 +345,7 @@ impl WorkspaceState {
         self.active_tab = WorkspaceTab::Editor(path.to_string());
     }
 
-    pub fn apply_editor_action(
-        &mut self,
-        path: &str,
-        action: iced::widget::text_editor::Action,
-    ) {
+    pub fn apply_editor_action(&mut self, path: &str, action: iced::widget::text_editor::Action) {
         if let Some(tab) = self.editor_tabs.iter_mut().find(|tab| tab.path == path) {
             tab.apply_action(action);
             self.active_tab = WorkspaceTab::Editor(path.to_string());

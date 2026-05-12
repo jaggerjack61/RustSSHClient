@@ -29,9 +29,7 @@ impl EditorLanguage {
             .unwrap_or_else(|| path.to_ascii_lowercase());
 
         match file_name.as_str() {
-            "dockerfile" | "makefile" | ".gitignore" | ".dockerignore" | ".env" => {
-                Self::Shell
-            }
+            "dockerfile" | "makefile" | ".gitignore" | ".dockerignore" | ".env" => Self::Shell,
             "cargo.toml" => Self::Toml,
             _ => match Path::new(&file_name)
                 .extension()
@@ -202,9 +200,18 @@ mod tests {
 
     #[test]
     fn infers_editor_language_from_path() {
-        assert_eq!(EditorLanguage::from_path("/srv/app/main.rs"), EditorLanguage::Rust);
-        assert_eq!(EditorLanguage::from_path("/srv/app/package.json"), EditorLanguage::Json);
-        assert_eq!(EditorLanguage::from_path("/srv/app/Dockerfile"), EditorLanguage::Shell);
+        assert_eq!(
+            EditorLanguage::from_path("/srv/app/main.rs"),
+            EditorLanguage::Rust
+        );
+        assert_eq!(
+            EditorLanguage::from_path("/srv/app/package.json"),
+            EditorLanguage::Json
+        );
+        assert_eq!(
+            EditorLanguage::from_path("/srv/app/Dockerfile"),
+            EditorLanguage::Shell
+        );
     }
 
     #[test]

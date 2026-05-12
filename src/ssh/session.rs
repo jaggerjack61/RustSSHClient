@@ -14,7 +14,8 @@ use crate::models::{
 use crate::sftp::client as sftp_client;
 use crate::ssh::client;
 
-const MAX_CONCURRENT_TRANSFER_WORKERS: usize = 4;
+pub const MAX_CONCURRENT_TRANSFERS: usize = 4;
+const MAX_CONCURRENT_TRANSFER_WORKERS: usize = MAX_CONCURRENT_TRANSFERS;
 static ACTIVE_TRANSFER_WORKERS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -218,10 +219,8 @@ fn run_session(
                 SessionCommand::LoadDirectoryChildren(directory) => {
                     match sftp_client::list_directory(&sftp, &directory) {
                         Ok(entries) => {
-                            let _ = event_tx.send(SessionEvent::DirectoryChildrenLoaded {
-                                directory,
-                                entries,
-                            });
+                            let _ = event_tx
+                                .send(SessionEvent::DirectoryChildrenLoaded { directory, entries });
                         }
                         Err(error) => {
                             let _ = event_tx.send(SessionEvent::DirectoryChildrenLoadFailed {
@@ -250,20 +249,18 @@ fn run_session(
                 SessionCommand::WriteFile {
                     remote_path,
                     contents,
-                } => {
-                    match sftp_client::write_text_file(&sftp, &remote_path, &contents) {
-                        Ok(()) => {
-                            let _ = event_tx.send(SessionEvent::FileSaved { path: remote_path });
-                            refresh_directory_or_report(&sftp, &cwd, &event_tx);
-                        }
-                        Err(error) => {
-                            let _ = event_tx.send(SessionEvent::FileSaveFailed {
-                                path: remote_path,
-                                error: error.to_string(),
-                            });
-                        }
+                } => match sftp_client::write_text_file(&sftp, &remote_path, &contents) {
+                    Ok(()) => {
+                        let _ = event_tx.send(SessionEvent::FileSaved { path: remote_path });
+                        refresh_directory_or_report(&sftp, &cwd, &event_tx);
                     }
-                }
+                    Err(error) => {
+                        let _ = event_tx.send(SessionEvent::FileSaveFailed {
+                            path: remote_path,
+                            error: error.to_string(),
+                        });
+                    }
+                },
                 SessionCommand::ResizeTerminal { cols, rows } => {
                     shell.request_pty_size(cols, rows, None, None)?;
                 }
@@ -469,6 +466,9 @@ fn spawn_transfer_worker<F>(
                 let _ = event_tx.send(SessionEvent::Transfer(progress.clone()));
             };
             operation(&sftp, &mut transfer, &mut progress_sender)?;
+            if finish_successful_transfer_if_needed(&mut transfer) {
+                let _ = event_tx.send(SessionEvent::Transfer(transfer.clone()));
+            }
             Ok(())
         })();
 
@@ -480,6 +480,15 @@ fn spawn_transfer_worker<F>(
     });
 }
 
+fn finish_successful_transfer_if_needed(transfer: &mut TransferProgress) -> bool {
+    if matches!(transfer.status, TransferStatus::Completed) {
+        return false;
+    }
+
+    transfer.status = TransferStatus::Completed;
+    true
+}
+
 fn file_label(paths: &[PathBuf]) -> String {
     if paths.len() == 1 {
         return paths[0]
@@ -489,4 +498,28 @@ fn file_label(paths: &[PathBuf]) -> String {
     }
 
     format!("{} files", paths.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::models::{TransferDirection, TransferProgress, TransferStatus};
+
+    #[test]
+    fn finishes_running_successful_transfer() {
+        let mut transfer = TransferProgress::queued("copy.txt", TransferDirection::Copy, 42);
+        transfer.status = TransferStatus::Running;
+        transfer.transferred_bytes = 42;
+
+        assert!(super::finish_successful_transfer_if_needed(&mut transfer));
+        assert!(matches!(transfer.status, TransferStatus::Completed));
+    }
+
+    #[test]
+    fn leaves_already_completed_successful_transfer_unchanged() {
+        let mut transfer = TransferProgress::queued("upload.txt", TransferDirection::Upload, 0);
+        transfer.status = TransferStatus::Completed;
+
+        assert!(!super::finish_successful_transfer_if_needed(&mut transfer));
+        assert!(matches!(transfer.status, TransferStatus::Completed));
+    }
 }

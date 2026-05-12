@@ -1,4 +1,7 @@
-use iced::widget::{button, column, container, mouse_area, opaque, row, scrollable, stack, text, text_input, tooltip, Space};
+use iced::widget::{
+    Space, button, column, container, mouse_area, opaque, row, scrollable, stack, text, text_input,
+    tooltip,
+};
 use iced::{Color, Element, Length};
 
 use crate::app::messages::{FileActionKind, Message};
@@ -38,9 +41,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         container(
             row![
                 column![
-                    text("EXPLORER")
-                        .size(10)
-                        .color(styles::text_slate_500()),
+                    text("EXPLORER").size(10).color(styles::text_slate_500()),
                     row![
                         up_button,
                         text(&state.workspace.current_directory)
@@ -114,13 +115,15 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     let details: Element<'_, Message> = if state.workspace.show_properties {
         if let Some(entry) = state.selected_file() {
             let mut panel = column![
-                text("Properties")
-                    .size(13)
-                    .color(styles::text_slate_500()),
+                text("Properties").size(13).color(styles::text_slate_500()),
                 text(&entry.name).size(14).color(Color::WHITE),
-                text(if entry.is_directory() { "Folder" } else { "File" })
-                    .size(11)
-                    .color(styles::text_slate_500()),
+                text(if entry.is_directory() {
+                    "Folder"
+                } else {
+                    "File"
+                })
+                .size(11)
+                .color(styles::text_slate_500()),
                 text(format!("Path: {}", entry.path))
                     .size(12)
                     .color(styles::text_slate_400()),
@@ -159,22 +162,14 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                             .padding([8, 12])
                             .style(styles::dark_input),
                         row![
-                            button(
-                                text("Apply")
-                                    .size(12)
-                                    .color(Color::WHITE),
-                            )
-                            .on_press(Message::ConfirmFileAction)
-                            .padding([6, 16])
-                            .style(styles::primary_button),
-                            button(
-                                text("Cancel")
-                                    .size(12)
-                                    .color(styles::text_slate_400()),
-                            )
-                            .on_press(Message::CancelFileAction)
-                            .padding([6, 16])
-                            .style(styles::ghost_button),
+                            button(text("Apply").size(12).color(Color::WHITE),)
+                                .on_press(Message::ConfirmFileAction)
+                                .padding([6, 16])
+                                .style(styles::primary_button),
+                            button(text("Cancel").size(12).color(styles::text_slate_400()),)
+                                .on_press(Message::CancelFileAction)
+                                .padding([6, 16])
+                                .style(styles::ghost_button),
                         ]
                         .spacing(8),
                     ]
@@ -191,12 +186,8 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         } else {
             let panel_content = container(
                 column![
-                    text("Properties")
-                        .size(13)
-                        .color(styles::text_slate_500()),
-                    text("Select a file or folder")
-                        .size(14)
-                        .color(Color::WHITE),
+                    text("Properties").size(13).color(styles::text_slate_500()),
+                    text("Select a file or folder").size(14).color(Color::WHITE),
                     text("Details for the current selection appear here.")
                         .size(12)
                         .color(styles::text_slate_400()),
@@ -218,13 +209,15 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     let footer = container(
         container(
             row![
-                container(Space::new().width(6).height(6)).style(|_theme: &iced::Theme| container::Style {
-                    background: Some(iced::Background::Color(styles::emerald_400())),
-                    border: iced::Border {
-                        radius: 3.into(),
+                container(Space::new().width(6).height(6)).style(|_theme: &iced::Theme| {
+                    container::Style {
+                        background: Some(iced::Background::Color(styles::emerald_400())),
+                        border: iced::Border {
+                            radius: 3.into(),
+                            ..Default::default()
+                        },
                         ..Default::default()
-                    },
-                    ..Default::default()
+                    }
                 }),
                 column![
                     text("Remote explorer")
@@ -248,18 +241,11 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     .style(styles::status_bar);
 
     // --- Assemble sidebar ---
-    container(
-        column![
-            header,
-            file_list,
-            details,
-            footer,
-        ],
-    )
-    .width(260)
-    .height(Length::Fill)
-    .style(styles::explorer_sidebar)
-    .into()
+    container(column![header, file_list, details, footer,])
+        .width(260)
+        .height(Length::Fill)
+        .style(styles::explorer_sidebar)
+        .into()
 }
 
 // ---------------------------------------------------------------------------
@@ -293,12 +279,7 @@ fn build_children<'a>(
         })
         .collect::<Vec<_>>();
 
-    children.sort_by(|left, right| {
-        left.is_directory()
-            .cmp(&right.is_directory())
-            .reverse()
-            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
-    });
+    children.sort_by_cached_key(|entry| (!entry.is_directory(), entry.name.to_lowercase()));
 
     children
         .into_iter()
@@ -334,11 +315,7 @@ fn render_tree_nodes<'a>(
         col = col.push(render_entry_row(state, node.entry, depth));
 
         // If this is an expanded directory, render its children indented
-        if node.entry.is_directory()
-            && state
-                .workspace
-                .expanded_folders
-                .contains(&node.entry.path)
+        if node.entry.is_directory() && state.workspace.expanded_folders.contains(&node.entry.path)
         {
             if !node.children.is_empty() {
                 col = col.push(render_tree_nodes(state, &node.children, depth + 1));
@@ -355,16 +332,9 @@ fn render_entry_row<'a>(
     depth: u16,
 ) -> Element<'a, Message> {
     let is_selected = state.workspace.selected_file.as_deref() == Some(&entry.path);
-    let is_expanded = entry.is_directory()
-        && state
-            .workspace
-            .expanded_folders
-            .contains(&entry.path);
-    let is_loading = entry.is_directory()
-        && state
-            .workspace
-            .loading_folders
-            .contains(&entry.path);
+    let is_expanded =
+        entry.is_directory() && state.workspace.expanded_folders.contains(&entry.path);
+    let is_loading = entry.is_directory() && state.workspace.loading_folders.contains(&entry.path);
 
     let (icon, icon_color) = file_icon(entry, is_expanded);
     let indent = (depth as f32) * 16.0;
@@ -441,75 +411,75 @@ fn file_icon(entry: &FileEntry, is_expanded: bool) -> (&'static str, Color) {
     let ext = entry.name.rsplit('.').next().unwrap_or("");
     match ext {
         // Code files
-        "rs" => ("\u{2699}", Color::from_rgb8(0xDE, 0x98, 0x3B)),        // ⚙ rust orange
-        "py" => ("\u{1F40D}", Color::from_rgb8(0x3B, 0x78, 0xA8)),       // 🐍 python blue
-        "js" | "jsx" => ("\u{26A1}", styles::orange_400()),                // ⚡ JS yellow-orange
-        "ts" | "tsx" => ("\u{1F4DC}", styles::blue_400()),                 // 📜 TS blue
-        "go" => ("\u{1F439}", Color::from_rgb8(0x00, 0xAD, 0xD8)),        // 🐹 go cyan
+        "rs" => ("\u{2699}", Color::from_rgb8(0xDE, 0x98, 0x3B)), // ⚙ rust orange
+        "py" => ("\u{1F40D}", Color::from_rgb8(0x3B, 0x78, 0xA8)), // 🐍 python blue
+        "js" | "jsx" => ("\u{26A1}", styles::orange_400()),       // ⚡ JS yellow-orange
+        "ts" | "tsx" => ("\u{1F4DC}", styles::blue_400()),        // 📜 TS blue
+        "go" => ("\u{1F439}", Color::from_rgb8(0x00, 0xAD, 0xD8)), // 🐹 go cyan
         "java" | "kt" => ("\u{2615}", Color::from_rgb8(0xB0, 0x72, 0x19)), // ☕ java brown
-        "c" | "h" => ("\u{1F6E0}", Color::from_rgb8(0x55, 0x99, 0xCC)),   // 🛠 c blue
+        "c" | "h" => ("\u{1F6E0}", Color::from_rgb8(0x55, 0x99, 0xCC)), // 🛠 c blue
         "cpp" | "cc" | "cxx" | "hpp" => ("\u{1F6E0}", Color::from_rgb8(0x66, 0x4E, 0xA8)), // 🛠 cpp purple
-        "rb" => ("\u{1F48E}", Color::from_rgb8(0xCC, 0x34, 0x2D)),        // 💎 ruby red
-        "php" => ("\u{1F418}", Color::from_rgb8(0x77, 0x7B, 0xB3)),       // 🐘 php purple
+        "rb" => ("\u{1F48E}", Color::from_rgb8(0xCC, 0x34, 0x2D)), // 💎 ruby red
+        "php" => ("\u{1F418}", Color::from_rgb8(0x77, 0x7B, 0xB3)), // 🐘 php purple
         "sh" | "bash" | "zsh" | "fish" => ("\u{1F4DF}", styles::emerald_400()), // 📟 shell green
-        "lua" => ("\u{1F319}", styles::blue_400()),                        // 🌙 lua blue
-        "r" | "R" => ("\u{1F4CA}", styles::blue_400()),                    // 📊 R blue
-        "swift" => ("\u{1F426}", styles::orange_400()),                    // 🐦 swift orange
+        "lua" => ("\u{1F319}", styles::blue_400()),                // 🌙 lua blue
+        "r" | "R" => ("\u{1F4CA}", styles::blue_400()),            // 📊 R blue
+        "swift" => ("\u{1F426}", styles::orange_400()),            // 🐦 swift orange
         "css" | "scss" | "sass" | "less" => ("\u{1F3A8}", styles::blue_400()), // 🎨 css blue
-        "html" | "htm" => ("\u{1F310}", styles::orange_400()),             // 🌐 html orange
+        "html" | "htm" => ("\u{1F310}", styles::orange_400()),     // 🌐 html orange
 
         // Data / config
-        "json" => ("\u{1F4CB}", styles::orange_400()),              // 📋 json orange
+        "json" => ("\u{1F4CB}", styles::orange_400()), // 📋 json orange
         "yml" | "yaml" => ("\u{1F4CB}", Color::from_rgb8(0xCB, 0x17, 0x1E)), // 📋 yaml red
         "toml" => ("\u{1F4CB}", Color::from_rgb8(0x9C, 0x4E, 0x21)), // 📋 toml brown
-        "xml" => ("\u{1F4CB}", styles::orange_400()),               // 📋 xml orange
-        "csv" => ("\u{1F4CA}", styles::emerald_400()),              // 📊 csv green
-        "sql" => ("\u{1F5C4}", styles::blue_400()),                 // 🗄 sql blue
+        "xml" => ("\u{1F4CB}", styles::orange_400()),  // 📋 xml orange
+        "csv" => ("\u{1F4CA}", styles::emerald_400()), // 📊 csv green
+        "sql" => ("\u{1F5C4}", styles::blue_400()),    // 🗄 sql blue
         "env" | "cfg" | "conf" | "ini" => ("\u{2699}", styles::text_slate_400()), // ⚙ config grey
 
         // Documents
-        "md" | "mdx" => ("\u{1F4DD}", styles::text_slate_400()),   // 📝 markdown grey
-        "txt" | "log" => ("\u{1F4C4}", styles::text_slate_400()),  // 📄 text grey
-        "pdf" => ("\u{1F4D5}", styles::red_400()),                 // 📕 pdf red
-        "doc" | "docx" => ("\u{1F4C3}", styles::blue_400()),       // 📃 word blue
-        "xls" | "xlsx" => ("\u{1F4CA}", styles::emerald_400()),    // 📊 excel green
-        "ppt" | "pptx" => ("\u{1F4CA}", styles::orange_400()),    // 📊 ppt orange
+        "md" | "mdx" => ("\u{1F4DD}", styles::text_slate_400()), // 📝 markdown grey
+        "txt" | "log" => ("\u{1F4C4}", styles::text_slate_400()), // 📄 text grey
+        "pdf" => ("\u{1F4D5}", styles::red_400()),               // 📕 pdf red
+        "doc" | "docx" => ("\u{1F4C3}", styles::blue_400()),     // 📃 word blue
+        "xls" | "xlsx" => ("\u{1F4CA}", styles::emerald_400()),  // 📊 excel green
+        "ppt" | "pptx" => ("\u{1F4CA}", styles::orange_400()),   // 📊 ppt orange
 
         // Images
         "png" | "jpg" | "jpeg" | "gif" | "svg" | "bmp" | "webp" | "ico" => {
-            ("\u{1F5BC}", Color::from_rgb8(0xA7, 0x8B, 0xFA))     // 🖼 image purple
+            ("\u{1F5BC}", Color::from_rgb8(0xA7, 0x8B, 0xFA)) // 🖼 image purple
         }
 
         // Archives
         "zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" => {
-            ("\u{1F4E6}", Color::from_rgb8(0xFB, 0xBF, 0x24))     // 📦 archive yellow
+            ("\u{1F4E6}", Color::from_rgb8(0xFB, 0xBF, 0x24)) // 📦 archive yellow
         }
 
         // Binary / executables
         "exe" | "dll" | "so" | "dylib" | "bin" | "o" | "a" => {
-            ("\u{2699}", styles::text_slate_500())                  // ⚙ binary grey
+            ("\u{2699}", styles::text_slate_500()) // ⚙ binary grey
         }
 
         // Lock files
-        "lock" => ("\u{1F512}", styles::text_slate_500()),         // 🔒 lock grey
+        "lock" => ("\u{1F512}", styles::text_slate_500()), // 🔒 lock grey
 
         // Fonts
         "ttf" | "otf" | "woff" | "woff2" => {
-            ("\u{1F524}", styles::text_slate_400())                 // 🔤 font grey
+            ("\u{1F524}", styles::text_slate_400()) // 🔤 font grey
         }
 
         // Video / audio
         "mp3" | "wav" | "flac" | "ogg" | "aac" => {
-            ("\u{1F3B5}", Color::from_rgb8(0xF4, 0x72, 0xB6))     // 🎵 audio pink
+            ("\u{1F3B5}", Color::from_rgb8(0xF4, 0x72, 0xB6)) // 🎵 audio pink
         }
         "mp4" | "mkv" | "avi" | "mov" | "webm" => {
-            ("\u{1F3AC}", Color::from_rgb8(0xF4, 0x72, 0xB6))     // 🎬 video pink
+            ("\u{1F3AC}", Color::from_rgb8(0xF4, 0x72, 0xB6)) // 🎬 video pink
         }
 
         // Docker
         "dockerfile" | "Dockerfile" => ("\u{1F433}", styles::blue_400()), // 🐳 docker blue
 
-        _ => ("\u{1F4C4}", styles::text_slate_400()),              // 📄 default
+        _ => ("\u{1F4C4}", styles::text_slate_400()), // 📄 default
     }
 }
 
@@ -541,12 +511,8 @@ fn explorer_icon_button<'a>(
 
 fn context_menu<'a>(entry: &'a FileEntry) -> Element<'a, Message> {
     let header = column![
-        text("ACTIONS")
-            .size(10)
-            .color(styles::text_slate_500()),
-        text(&entry.name)
-            .size(12)
-            .color(Color::WHITE),
+        text("ACTIONS").size(10).color(styles::text_slate_500()),
+        text(&entry.name).size(12).color(Color::WHITE),
     ]
     .spacing(2);
 
@@ -613,20 +579,16 @@ fn context_menu_button<'a>(
     destructive: bool,
 ) -> Element<'a, Message> {
     let content = row![
-        text(icon)
-            .size(12)
-            .color(if destructive {
-                styles::red_400()
-            } else {
-                styles::text_slate_400()
-            }),
-        text(label)
-            .size(12)
-            .color(if destructive {
-                styles::red_400()
-            } else {
-                Color::WHITE
-            }),
+        text(icon).size(12).color(if destructive {
+            styles::red_400()
+        } else {
+            styles::text_slate_400()
+        }),
+        text(label).size(12).color(if destructive {
+            styles::red_400()
+        } else {
+            Color::WHITE
+        }),
     ]
     .spacing(8)
     .align_y(iced::Alignment::Center);
@@ -709,7 +671,10 @@ mod tests {
         assert_eq!(tree[0].children.len(), 2);
         assert_eq!(tree[0].children[0].entry.path, "/srv/app/src");
         assert_eq!(tree[0].children[0].children.len(), 1);
-        assert_eq!(tree[0].children[0].children[0].entry.path, "/srv/app/src/main.rs");
+        assert_eq!(
+            tree[0].children[0].children[0].entry.path,
+            "/srv/app/src/main.rs"
+        );
         assert_eq!(tree[0].children[1].entry.path, "/srv/app/README.md");
     }
 

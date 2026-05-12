@@ -21,9 +21,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                     ..Default::default()
                 }),
             column![
-                text("SSH Client")
-                    .size(16)
-                    .color(styles::text_white()),
+                text("SSH Client").size(16).color(styles::text_white()),
                 text("v0.1.0")
                     .size(11)
                     .color(Color::from_rgba8(0x3b, 0x82, 0xf6, 0.7)),
@@ -68,20 +66,16 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
             row![
                 text(icon).size(18),
                 column![
-                    text(host.label.clone())
-                        .size(14)
-                        .color(if is_editing {
-                            styles::text_white()
-                        } else {
-                            styles::text_slate_400()
-                        }),
-                    text(host_port)
-                        .size(10)
-                        .color(if is_editing {
-                            styles::text_slate_400()
-                        } else {
-                            styles::text_slate_500()
-                        }),
+                    text(host.label.clone()).size(14).color(if is_editing {
+                        styles::text_white()
+                    } else {
+                        styles::text_slate_400()
+                    }),
+                    text(host_port).size(10).color(if is_editing {
+                        styles::text_slate_400()
+                    } else {
+                        styles::text_slate_500()
+                    }),
                 ]
                 .spacing(2)
                 .width(Length::Fill),
@@ -100,13 +94,9 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         };
 
         let delete_button = button(
-            container(
-                text("\u{1F5D1}")
-                    .size(14)
-                    .color(styles::text_slate_500()),
-            )
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
+            container(text("\u{1F5D1}").size(14).color(styles::text_slate_500()))
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
         )
         .on_press(Message::DeleteHost(host.id))
         .padding([10, 0])
@@ -129,11 +119,9 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     .padding([12, 12]);
 
     // --- Assemble sidebar ---
-    container(
-        column![header, section_label, host_list].height(Length::Fill),
-    )
-    .width(300)
-    .height(Length::Fill)
-    .style(styles::sidebar_container)
-    .into()
+    container(column![header, section_label, host_list].height(Length::Fill))
+        .width(300)
+        .height(Length::Fill)
+        .style(styles::sidebar_container)
+        .into()
 }

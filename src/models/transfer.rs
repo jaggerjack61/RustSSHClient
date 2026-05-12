@@ -43,10 +43,27 @@ impl TransferProgress {
     }
 
     pub fn percent_complete(&self) -> f32 {
+        if matches!(self.status, TransferStatus::Completed) {
+            return 1.0;
+        }
+
         if self.total_bytes == 0 {
             return 0.0;
         }
 
         (self.transferred_bytes as f32 / self.total_bytes as f32).clamp(0.0, 1.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TransferDirection, TransferProgress, TransferStatus};
+
+    #[test]
+    fn completed_zero_byte_transfer_reports_complete_percent() {
+        let mut transfer = TransferProgress::queued("empty.txt", TransferDirection::Upload, 0);
+        transfer.status = TransferStatus::Completed;
+
+        assert_eq!(transfer.percent_complete(), 1.0);
     }
 }

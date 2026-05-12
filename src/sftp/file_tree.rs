@@ -147,7 +147,7 @@ pub fn infer_kind(mode: Option<u32>) -> FileKind {
         0o040000 => FileKind::Directory,
         0o120000 => FileKind::Symlink,
         0o100000 => FileKind::File,
-        _ => FileKind::Other,
+        _ => FileKind::File,
     }
 }
 

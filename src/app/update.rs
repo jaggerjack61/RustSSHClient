@@ -1,14 +1,16 @@
 use std::path::Path;
 use std::time::Duration;
 
-use iced::{Event, Subscription, Task, event, keyboard, time, window};
-use iced::keyboard::key::Named;
 use iced::keyboard::Key;
+use iced::keyboard::key::Named;
+use iced::{Event, Subscription, Task, event, keyboard, time, window};
 
 use crate::app::messages::{FileActionKind, Message};
 use crate::app::state::{AppState, NotificationLevel, PendingFileAction, Route};
 use crate::models::{AuthType, HostRecord, TransferStatus, WorkspaceTab};
-use crate::sftp::file_tree::{DirectoryHint, collapse_segments, normalize_remote_path, parse_cd_command};
+use crate::sftp::file_tree::{
+    DirectoryHint, collapse_segments, normalize_remote_path, parse_cd_command,
+};
 use crate::sftp::transfers::merge_transfer;
 use crate::ssh::session::{SessionCommand, SessionEvent};
 use crate::ssh::terminal;
@@ -76,10 +78,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::ToggleKeyManager => {
-            state.notification(
-                NotificationLevel::Info,
-                KEY_MANAGER_COMING_SOON_MESSAGE,
-            );
+            state.notification(NotificationLevel::Info, KEY_MANAGER_COMING_SOON_MESSAGE);
             Task::none()
         }
         Message::OpenAdvancedSettings => {
@@ -100,9 +99,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             }
             Task::none()
         }
-        Message::ConnectPressed => {
-            begin_connect(state)
-        }
+        Message::ConnectPressed => begin_connect(state),
         Message::SessionSpawned(result) => {
             state.login.connecting = false;
             match result {
@@ -267,10 +264,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                                 request_directory_refresh(state, None);
                             }
                             DirectoryHint::HomeRelative(sub) => {
-                                request_directory_refresh(
-                                    state,
-                                    Some(format!("~/{sub}")),
-                                );
+                                request_directory_refresh(state, Some(format!("~/{sub}")));
                             }
                             DirectoryHint::Absolute(path) => {
                                 request_directory_refresh(state, Some(path));
@@ -280,9 +274,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 }
 
                 // Translate the key event to PTY bytes and send.
-                if let Some(bytes) =
-                    terminal::key_to_bytes(&key, modifiers, text.as_deref())
-                {
+                if let Some(bytes) = terminal::key_to_bytes(&key, modifiers, text.as_deref()) {
                     send_session_command(state, SessionCommand::SendInput(bytes));
                 }
                 Task::none()
@@ -293,9 +285,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.workspace.terminal.clear();
             Task::none()
         }
-        Message::CopyTerminalOutput => {
-            copy_terminal_output(state)
-        }
+        Message::CopyTerminalOutput => copy_terminal_output(state),
         Message::PasteTerminalInput => handle_terminal_paste(state),
         Message::DisconnectPressed => {
             if send_session_command(state, SessionCommand::Disconnect) {
@@ -306,10 +296,7 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::RefreshDirectory => {
             state.workspace.explorer_context_for = None;
             state.workspace.show_properties = false;
-            request_directory_refresh(
-                state,
-                Some(state.workspace.current_directory.clone()),
-            );
+            request_directory_refresh(state, Some(state.workspace.current_directory.clone()));
             Task::none()
         }
         Message::NavigateUpDirectory => {
@@ -389,22 +376,23 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.workspace.show_properties = false;
             Task::none()
         }
-        Message::OpenSelectedFileInEditor => {
-            open_selected_file_in_editor(state)
-        }
+        Message::OpenSelectedFileInEditor => open_selected_file_in_editor(state),
         Message::EditorAction(path, action) => {
             state.workspace.apply_editor_action(&path, action);
             Task::none()
         }
-        Message::SaveActiveEditor => {
-            save_active_editor(state)
-        }
+        Message::SaveActiveEditor => save_active_editor(state),
         Message::ActivateTerminalTab => {
             state.workspace.active_tab = WorkspaceTab::Terminal;
             Task::none()
         }
         Message::ActivateEditorTab(path) => {
-            if state.workspace.editor_tabs.iter().any(|tab| tab.path == path) {
+            if state
+                .workspace
+                .editor_tabs
+                .iter()
+                .any(|tab| tab.path == path)
+            {
                 state.workspace.active_tab = WorkspaceTab::Editor(path);
             }
             Task::none()
@@ -506,6 +494,10 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             let Some(action) = state.workspace.pending_file_action.clone() else {
                 return Task::none();
             };
+            if action.value.trim().is_empty() {
+                state.notification(NotificationLevel::Info, "Enter a target path.");
+                return Task::none();
+            }
             let Some(selected) = state.selected_file().cloned() else {
                 return Task::none();
             };
@@ -521,24 +513,20 @@ pub fn update(state: &mut AppState, message: Message) -> Task<Message> {
             );
 
             let sent = match action.kind {
-                FileActionKind::Rename | FileActionKind::Move => {
-                    send_session_command(
-                        state,
-                        SessionCommand::Rename {
-                            source: selected.path,
-                            target,
-                        },
-                    )
-                }
-                FileActionKind::Copy => {
-                    send_session_command(
-                        state,
-                        SessionCommand::Copy {
-                            source: selected.path,
-                            target,
-                        },
-                    )
-                }
+                FileActionKind::Rename | FileActionKind::Move => send_session_command(
+                    state,
+                    SessionCommand::Rename {
+                        source: selected.path,
+                        target,
+                    },
+                ),
+                FileActionKind::Copy => send_session_command(
+                    state,
+                    SessionCommand::Copy {
+                        source: selected.path,
+                        target,
+                    },
+                ),
             };
 
             if sent {
@@ -678,10 +666,7 @@ fn drain_session_events(state: &mut AppState) -> Task<Message> {
             }
             SessionEvent::FileSaved { path } => {
                 state.workspace.mark_editor_saved(&path);
-                state.notification(
-                    NotificationLevel::Success,
-                    format!("Saved {path}"),
-                );
+                state.notification(NotificationLevel::Success, format!("Saved {path}"));
             }
             SessionEvent::FileSaveFailed { path, error } => {
                 state.workspace.mark_editor_save_failed(&path);
@@ -782,7 +767,10 @@ fn request_directory_children(state: &mut AppState, path: String) -> bool {
     }
 }
 
-fn should_notify_directory_open_failure(pending_directory: Option<&str>, failed_path: &str) -> bool {
+fn should_notify_directory_open_failure(
+    pending_directory: Option<&str>,
+    failed_path: &str,
+) -> bool {
     pending_directory == Some(failed_path)
 }
 
@@ -791,9 +779,7 @@ fn merge_directory_children(
     directory: &str,
     entries: Vec<crate::models::FileEntry>,
 ) {
-    files.retain(|entry| {
-        entry.path == directory || !is_descendant_path(&entry.path, directory)
-    });
+    files.retain(|entry| entry.path == directory || !is_descendant_path(&entry.path, directory));
     files.extend(entries);
 }
 
@@ -898,7 +884,10 @@ fn open_selected_file_in_editor(state: &mut AppState) -> Task<Message> {
     };
 
     if selected.is_directory() {
-        state.notification(NotificationLevel::Info, "Folders cannot be opened in the editor.");
+        state.notification(
+            NotificationLevel::Info,
+            "Folders cannot be opened in the editor.",
+        );
         return Task::none();
     }
 
@@ -981,8 +970,9 @@ fn terminal_geometry_from_window(width: f32, height: f32) -> (u32, u32) {
     let transfer_allowance = 72.0_f32;
 
     let available_width = (width - sidebar_width - terminal_padding_width).max(320.0);
-    let available_height = (height - tab_bar_height - footer_height - terminal_padding_height - transfer_allowance)
-        .max(180.0);
+    let available_height =
+        (height - tab_bar_height - footer_height - terminal_padding_height - transfer_allowance)
+            .max(180.0);
 
     let cols = (available_width / 8.0).floor().clamp(20.0, 240.0) as u32;
     let rows = (available_height / 18.0).floor().clamp(8.0, 120.0) as u32;
@@ -1004,7 +994,7 @@ mod tests {
     use iced::widget::text_editor;
 
     use crate::app::messages::{FileActionKind, Message};
-    use crate::app::state::{AppState, Route};
+    use crate::app::state::{AppState, PendingFileAction, Route};
     use crate::models::{EditorLanguage, FileEntry, FileKind, SaveLifetime, WorkspaceTab};
     use crate::ssh::session::{SessionCommand, SessionEvent, SessionHandle};
     use crate::storage::StorageFacade;
@@ -1104,6 +1094,30 @@ mod tests {
     }
 
     #[test]
+    fn confirm_file_action_rejects_empty_target() {
+        let (command_tx, command_rx) = unbounded();
+        let (_event_tx, event_rx) = unbounded();
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        state.workspace.files = vec![text_file_entry("/srv/app/settings.toml", "settings.toml")];
+        state.workspace.selected_file = Some("/srv/app/settings.toml".into());
+        state.workspace.pending_file_action = Some(PendingFileAction {
+            kind: FileActionKind::Rename,
+            value: "  ".into(),
+        });
+
+        let _ = super::update(&mut state, Message::ConfirmFileAction);
+
+        assert!(command_rx.try_recv().is_err());
+        assert!(state.workspace.pending_file_action.is_some());
+        assert_eq!(state.notifications.len(), 1);
+        assert_eq!(
+            state.notifications[0].level,
+            crate::app::state::NotificationLevel::Info
+        );
+    }
+
+    #[test]
     fn opens_explorer_context_menu_on_secondary_press() {
         let (mut state, _) = AppState::boot();
         state.workspace.selected_file = None;
@@ -1114,7 +1128,10 @@ mod tests {
         );
 
         assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app"));
-        assert_eq!(state.workspace.explorer_context_for.as_deref(), Some("/srv/app"));
+        assert_eq!(
+            state.workspace.explorer_context_for.as_deref(),
+            Some("/srv/app")
+        );
     }
 
     #[test]
@@ -1125,7 +1142,10 @@ mod tests {
 
         let _ = super::update(&mut state, Message::DismissExplorerContextMenu);
 
-        assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app/README.md"));
+        assert_eq!(
+            state.workspace.selected_file.as_deref(),
+            Some("/srv/app/README.md")
+        );
         assert!(state.workspace.explorer_context_for.is_none());
     }
 
@@ -1141,7 +1161,10 @@ mod tests {
         );
 
         assert!(state.workspace.explorer_context_for.is_none());
-        assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app/README.md"));
+        assert_eq!(
+            state.workspace.selected_file.as_deref(),
+            Some("/srv/app/README.md")
+        );
     }
 
     #[test]
@@ -1156,17 +1179,13 @@ mod tests {
 
     #[test]
     fn navigates_up_from_current_directory() {
-        assert_eq!(
-            super::parent_directory("/srv/app/releases"),
-            "/srv/app"
-        );
+        assert_eq!(super::parent_directory("/srv/app/releases"), "/srv/app");
     }
 
     #[test]
     fn ignores_stale_directory_errors_after_successful_load() {
         assert!(!super::should_notify_directory_open_failure(
-            None,
-            "/srv/old",
+            None, "/srv/old",
         ));
         assert!(!super::should_notify_directory_open_failure(
             Some("/srv/app"),
@@ -1180,7 +1199,10 @@ mod tests {
 
     #[test]
     fn project_link_points_to_repository() {
-        assert_eq!(super::PROJECT_URL, "https://github.com/jaggerjack61/RustSSHClient");
+        assert_eq!(
+            super::PROJECT_URL,
+            "https://github.com/jaggerjack61/RustSSHClient"
+        );
     }
 
     #[test]
@@ -1191,8 +1213,14 @@ mod tests {
 
         assert!(!state.key_manager_open);
         assert_eq!(state.notifications.len(), 1);
-        assert_eq!(state.notifications[0].level, crate::app::state::NotificationLevel::Info);
-        assert_eq!(state.notifications[0].message, "Key Manager is coming soon.");
+        assert_eq!(
+            state.notifications[0].level,
+            crate::app::state::NotificationLevel::Info
+        );
+        assert_eq!(
+            state.notifications[0].message,
+            "Key Manager is coming soon."
+        );
     }
 
     #[test]
@@ -1213,7 +1241,8 @@ mod tests {
     fn opens_unknown_extension_file_in_editor_and_dispatches_session_command() {
         let (command_tx, command_rx) = unbounded();
         let (_event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.files = vec![text_file_entry("/srv/app/Procfile", "Procfile")];
         state.workspace.selected_file = Some("/srv/app/Procfile".into());
@@ -1223,7 +1252,10 @@ mod tests {
         assert_eq!(state.workspace.editor_tabs.len(), 1);
         assert_eq!(state.workspace.editor_tabs[0].title, "Procfile");
         assert!(state.workspace.editor_tabs[0].is_loading);
-        assert_eq!(state.workspace.active_tab, WorkspaceTab::Editor("/srv/app/Procfile".into()));
+        assert_eq!(
+            state.workspace.active_tab,
+            WorkspaceTab::Editor("/srv/app/Procfile".into())
+        );
         assert_eq!(
             command_rx.try_recv().expect("editor read command"),
             SessionCommand::ReadFile {
@@ -1236,7 +1268,8 @@ mod tests {
     fn does_not_open_directories_in_editor() {
         let (command_tx, command_rx) = unbounded();
         let (_event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.files = vec![directory_entry("/srv/app/config", "config")];
         state.workspace.selected_file = Some("/srv/app/config".into());
@@ -1251,7 +1284,8 @@ mod tests {
     fn double_clicking_a_file_opens_it_in_editor() {
         let (command_tx, command_rx) = unbounded();
         let (_event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.files = vec![text_file_entry("/srv/app/README.md", "README.md")];
 
@@ -1260,9 +1294,15 @@ mod tests {
             Message::ExplorerEntryDoubleClicked("/srv/app/README.md".into()),
         );
 
-        assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app/README.md"));
+        assert_eq!(
+            state.workspace.selected_file.as_deref(),
+            Some("/srv/app/README.md")
+        );
         assert_eq!(state.workspace.editor_tabs.len(), 1);
-        assert_eq!(state.workspace.active_tab, WorkspaceTab::Editor("/srv/app/README.md".into()));
+        assert_eq!(
+            state.workspace.active_tab,
+            WorkspaceTab::Editor("/srv/app/README.md".into())
+        );
         assert_eq!(
             command_rx.try_recv().expect("editor read command"),
             SessionCommand::ReadFile {
@@ -1275,7 +1315,8 @@ mod tests {
     fn single_clicking_directory_requests_lazy_child_load() {
         let (command_tx, command_rx) = unbounded();
         let (_event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
         state.workspace.files = vec![directory_entry("/srv/app/src", "src")];
 
         let _ = super::update(
@@ -1283,7 +1324,10 @@ mod tests {
             Message::ExplorerEntryPressed("/srv/app/src".into()),
         );
 
-        assert_eq!(state.workspace.selected_file.as_deref(), Some("/srv/app/src"));
+        assert_eq!(
+            state.workspace.selected_file.as_deref(),
+            Some("/srv/app/src")
+        );
         assert!(state.workspace.expanded_folders.contains("/srv/app/src"));
         assert_eq!(
             command_rx.try_recv().expect("child load command"),
@@ -1295,13 +1339,17 @@ mod tests {
     fn directory_child_load_merges_entries_without_changing_current_directory() {
         let (command_tx, _command_rx) = unbounded();
         let (event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
         state.workspace.current_directory = "/srv/app".into();
         state.workspace.files = vec![
             directory_entry("/srv/app/src", "src"),
             text_file_entry("/srv/app/README.md", "README.md"),
         ];
-        state.workspace.expanded_folders.insert("/srv/app/src".into());
+        state
+            .workspace
+            .expanded_folders
+            .insert("/srv/app/src".into());
 
         event_tx
             .send(SessionEvent::DirectoryChildrenLoaded {
@@ -1313,11 +1361,13 @@ mod tests {
         let _ = super::update(&mut state, Message::Tick(Instant::now()));
 
         assert_eq!(state.workspace.current_directory, "/srv/app");
-        assert!(state
-            .workspace
-            .files
-            .iter()
-            .any(|entry| entry.path == "/srv/app/src/main.rs"));
+        assert!(
+            state
+                .workspace
+                .files
+                .iter()
+                .any(|entry| entry.path == "/srv/app/src/main.rs")
+        );
         assert!(state.workspace.expanded_folders.contains("/srv/app/src"));
     }
 
@@ -1325,7 +1375,8 @@ mod tests {
     fn loads_editor_contents_from_session_event() {
         let (command_tx, _command_rx) = unbounded();
         let (event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.open_editor_tab("/srv/app/src/main.rs");
         event_tx
@@ -1348,7 +1399,8 @@ mod tests {
     fn stores_editor_load_failures_in_tab_state() {
         let (command_tx, _command_rx) = unbounded();
         let (event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.open_editor_tab("/srv/app/README.md");
         event_tx
@@ -1361,7 +1413,10 @@ mod tests {
         let _ = super::update(&mut state, Message::Tick(Instant::now()));
 
         let editor = state.active_editor().expect("active editor");
-        assert_eq!(editor.load_error.as_deref(), Some("File is not valid UTF-8 text."));
+        assert_eq!(
+            editor.load_error.as_deref(),
+            Some("File is not valid UTF-8 text.")
+        );
         assert!(!editor.is_loading);
     }
 
@@ -1369,9 +1424,14 @@ mod tests {
     fn closes_active_editor_tab_and_returns_to_terminal() {
         let (mut state, _) = AppState::boot();
         state.workspace.open_editor_tab("/srv/app/README.md");
-        state.workspace.apply_editor_content("/srv/app/README.md", "# RustSSH\n".into());
+        state
+            .workspace
+            .apply_editor_content("/srv/app/README.md", "# RustSSH\n".into());
 
-        let _ = super::update(&mut state, Message::CloseEditorTab("/srv/app/README.md".into()));
+        let _ = super::update(
+            &mut state,
+            Message::CloseEditorTab("/srv/app/README.md".into()),
+        );
 
         assert!(state.workspace.editor_tabs.is_empty());
         assert_eq!(state.workspace.active_tab, WorkspaceTab::Terminal);
@@ -1381,7 +1441,9 @@ mod tests {
     fn editor_actions_mark_document_dirty() {
         let (mut state, _) = AppState::boot();
         state.workspace.open_editor_tab("/srv/app/README.md");
-        state.workspace.apply_editor_content("/srv/app/README.md", "hello".into());
+        state
+            .workspace
+            .apply_editor_content("/srv/app/README.md", "hello".into());
 
         let _ = super::update(
             &mut state,
@@ -1407,10 +1469,13 @@ mod tests {
     fn save_active_editor_dispatches_write_command() {
         let (command_tx, command_rx) = unbounded();
         let (_event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.open_editor_tab("/srv/app/README.md");
-        state.workspace.apply_editor_content("/srv/app/README.md", "hello".into());
+        state
+            .workspace
+            .apply_editor_content("/srv/app/README.md", "hello".into());
         state.workspace.apply_editor_action(
             "/srv/app/README.md",
             text_editor::Action::Move(text_editor::Motion::DocumentEnd),
@@ -1436,10 +1501,13 @@ mod tests {
     fn file_saved_event_clears_dirty_state() {
         let (command_tx, _command_rx) = unbounded();
         let (event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.open_editor_tab("/srv/app/README.md");
-        state.workspace.apply_editor_content("/srv/app/README.md", "hello".into());
+        state
+            .workspace
+            .apply_editor_content("/srv/app/README.md", "hello".into());
         state.workspace.apply_editor_action(
             "/srv/app/README.md",
             text_editor::Action::Move(text_editor::Motion::DocumentEnd),
@@ -1468,10 +1536,13 @@ mod tests {
     fn file_save_failure_preserves_dirty_state() {
         let (command_tx, _command_rx) = unbounded();
         let (event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.open_editor_tab("/srv/app/README.md");
-        state.workspace.apply_editor_content("/srv/app/README.md", "hello".into());
+        state
+            .workspace
+            .apply_editor_content("/srv/app/README.md", "hello".into());
         state.workspace.apply_editor_action(
             "/srv/app/README.md",
             text_editor::Action::Move(text_editor::Motion::DocumentEnd),
@@ -1500,13 +1571,16 @@ mod tests {
     fn reuses_existing_editor_tab_for_same_path() {
         let (command_tx, command_rx) = unbounded();
         let (_event_tx, event_rx) = unbounded();
-        let mut state = workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
+        let mut state =
+            workspace_state_with_session(SessionHandle::from_channels(command_tx, event_rx));
 
         state.workspace.files = vec![text_file_entry("/srv/app/README.md", "README.md")];
         state.workspace.selected_file = Some("/srv/app/README.md".into());
 
         let _ = super::update(&mut state, Message::OpenSelectedFileInEditor);
-        state.workspace.apply_editor_content("/srv/app/README.md", "# RustSSH\n".into());
+        state
+            .workspace
+            .apply_editor_content("/srv/app/README.md", "# RustSSH\n".into());
         let _ = command_rx.try_recv();
 
         let _ = super::update(&mut state, Message::OpenSelectedFileInEditor);

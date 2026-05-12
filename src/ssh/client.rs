@@ -48,12 +48,10 @@ pub fn connect_session(request: &LoginRequest, key: Option<&SshKeyRecord>) -> Ap
 
     let mut session = Session::new().map_err(|error| AppError::Ssh(error.to_string()))?;
     session.set_tcp_stream(tcp);
-    let kex_preferences = configure_method_preferences(&session, MethodType::Kex, PREFERRED_KEX_METHODS);
-    let hostkey_preferences = configure_method_preferences(
-        &session,
-        MethodType::HostKey,
-        PREFERRED_HOSTKEY_METHODS,
-    );
+    let kex_preferences =
+        configure_method_preferences(&session, MethodType::Kex, PREFERRED_KEX_METHODS);
+    let hostkey_preferences =
+        configure_method_preferences(&session, MethodType::HostKey, PREFERRED_HOSTKEY_METHODS);
 
     session.handshake().map_err(|error| {
         handshake_error(
@@ -116,9 +114,7 @@ fn authenticate(
 
 fn connect_tcp_stream(request: &LoginRequest) -> AppResult<TcpStream> {
     let socket_address = request.socket_address();
-    let addresses = socket_address
-        .to_socket_addrs()?
-        .collect::<Vec<_>>();
+    let addresses = socket_address.to_socket_addrs()?.collect::<Vec<_>>();
 
     if addresses.is_empty() {
         return Err(AppError::Validation(format!(
@@ -136,7 +132,9 @@ fn connect_tcp_stream(request: &LoginRequest) -> AppResult<TcpStream> {
     }
 
     Err(last_error
-        .unwrap_or_else(|| std::io::Error::other(format!("Unable to connect to {}.", socket_address)))
+        .unwrap_or_else(|| {
+            std::io::Error::other(format!("Unable to connect to {}.", socket_address))
+        })
         .into())
 }
 
@@ -230,7 +228,7 @@ fn handshake_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_method_preferences, PREFERRED_KEX_METHODS};
+    use super::{PREFERRED_KEX_METHODS, build_method_preferences};
     #[cfg(windows)]
     use ssh2::{MethodType, Session};
 
@@ -255,7 +253,9 @@ mod tests {
     #[test]
     fn windows_build_exposes_modern_kex_and_hostkey_algorithms() {
         let session = Session::new().expect("create session");
-        let kex = session.supported_algs(MethodType::Kex).expect("kex algorithms");
+        let kex = session
+            .supported_algs(MethodType::Kex)
+            .expect("kex algorithms");
         let host_keys = session
             .supported_algs(MethodType::HostKey)
             .expect("host key algorithms");

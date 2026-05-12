@@ -3,16 +3,15 @@
 /// Tests that require an SSH connection are gated behind
 /// `#[ignore = "requires TEST_SSH_* environment variables"]` and must be run
 /// with `cargo test -- --ignored` when the environment is configured.
-
 use std::path::Path;
 
 use rust_ssh_client::models::{
-    AuthType, FileKind, LoginRequest, SshKeyRecord, TransferDirection, TransferProgress,
-    TransferStatus,
+    AuthType, FileKind, LoginRequest, SaveLifetime, SshKeyRecord, TransferDirection,
+    TransferProgress, TransferStatus,
 };
 use rust_ssh_client::sftp::file_tree::{
-    collapse_segments, format_permissions, infer_kind, normalize_remote_path, parse_cd_command,
-    DirectoryHint,
+    DirectoryHint, collapse_segments, format_permissions, infer_kind, normalize_remote_path,
+    parse_cd_command,
 };
 use rust_ssh_client::sftp::transfers::merge_transfer;
 
@@ -169,7 +168,10 @@ fn collapse_segments_complex() {
 
 #[test]
 fn ssh_key_record_redacts_debug() {
-    let key = SshKeyRecord::new("prod-key", "-----BEGIN RSA PRIVATE KEY-----\ndata\n-----END RSA PRIVATE KEY-----");
+    let key = SshKeyRecord::new(
+        "prod-key",
+        "-----BEGIN RSA PRIVATE KEY-----\ndata\n-----END RSA PRIVATE KEY-----",
+    );
     let debug = format!("{key:?}");
     assert!(debug.contains("<redacted>"));
     assert!(!debug.contains("data"));
@@ -181,8 +183,8 @@ fn ssh_key_record_redacts_debug() {
 
 #[test]
 fn snapshot_round_trip_via_facade() {
-    use rust_ssh_client::storage::StorageFacade;
     use rust_ssh_client::models::HostRecord;
+    use rust_ssh_client::storage::StorageFacade;
     use tempfile::tempdir;
 
     let dir = tempdir().expect("create tempdir");
@@ -198,6 +200,7 @@ fn snapshot_round_trip_via_facade() {
         auth_type: AuthType::Password,
         key_reference: None,
         save_host: true,
+        save_lifetime: SaveLifetime::Forever,
     };
 
     let snapshot = rust_ssh_client::storage::StorageSnapshot {
@@ -246,18 +249,18 @@ fn format_permissions_none() {
 // connect with a reasonable timeout — this is a compile-time verification.
 
 // ---------------------------------------------------------------------------
-// Fix #21 – Dead editor code removed
+// Editor modules are part of the active workspace editor surface.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn editor_files_removed() {
+fn editor_modules_are_present() {
     assert!(
-        !Path::new("src/models/editor.rs").exists(),
-        "models/editor.rs should have been removed"
+        Path::new("src/models/editor.rs").exists(),
+        "models/editor.rs should be present"
     );
     assert!(
-        !Path::new("src/ui/editor.rs").exists(),
-        "ui/editor.rs should have been removed"
+        Path::new("src/ui/editor.rs").exists(),
+        "ui/editor.rs should be present"
     );
 }
 

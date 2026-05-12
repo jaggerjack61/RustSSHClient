@@ -169,7 +169,8 @@ fn load_or_create_fallback_master_key(vault_path: &Path) -> AppResult<[u8; 32]> 
 
     if vault_path.exists() {
         return Err(AppError::Crypto(
-            "Existing encrypted storage cannot be opened because the master key is unavailable.".into(),
+            "Existing encrypted storage cannot be opened because the master key is unavailable."
+                .into(),
         ));
     }
 
@@ -260,8 +261,7 @@ mod tests {
         let vault_path = tempdir.path().join("hosts.vault");
         let expected = [9_u8; 32];
 
-        super::sync_fallback_master_key(&vault_path, &expected)
-            .expect("sync fallback master key");
+        super::sync_fallback_master_key(&vault_path, &expected).expect("sync fallback master key");
         let loaded = super::load_or_create_fallback_master_key(&vault_path)
             .expect("load synced fallback master key");
 
@@ -277,8 +277,6 @@ mod tests {
         let error = super::load_or_create_fallback_master_key(&vault_path)
             .expect_err("missing key should error");
 
-        assert!(error
-            .to_string()
-            .contains("master key is unavailable"));
+        assert!(error.to_string().contains("master key is unavailable"));
     }
 }

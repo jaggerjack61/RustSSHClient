@@ -352,8 +352,13 @@ pub fn key_to_bytes(key: &Key, modifiers: Modifiers, text: Option<&str>) -> Opti
             Named::F11 => Some(b"\x1B[23~".to_vec()),
             Named::F12 => Some(b"\x1B[24~".to_vec()),
             // Modifier-only keys produce no output.
-            Named::Shift | Named::Control | Named::Alt | Named::Super
-            | Named::CapsLock | Named::NumLock | Named::ScrollLock => None,
+            Named::Shift
+            | Named::Control
+            | Named::Alt
+            | Named::Super
+            | Named::CapsLock
+            | Named::NumLock
+            | Named::ScrollLock => None,
             _ => None,
         };
     }
@@ -388,11 +393,7 @@ mod tests {
 
     #[test]
     fn ctrl_c_sends_etx() {
-        let bytes = key_to_bytes(
-            &Key::Character("c".into()),
-            Modifiers::CTRL,
-            Some("c"),
-        );
+        let bytes = key_to_bytes(&Key::Character("c".into()), Modifiers::CTRL, Some("c"));
         assert_eq!(bytes, Some(vec![0x03]));
     }
 
@@ -410,11 +411,7 @@ mod tests {
 
     #[test]
     fn regular_character() {
-        let bytes = key_to_bytes(
-            &Key::Character("a".into()),
-            Modifiers::empty(),
-            Some("a"),
-        );
+        let bytes = key_to_bytes(&Key::Character("a".into()), Modifiers::empty(), Some("a"));
         assert_eq!(bytes, Some(vec![b'a']));
     }
 
@@ -426,9 +423,15 @@ mod tests {
 
     #[test]
     fn extracts_command_from_prompt() {
-        assert_eq!(extract_command_from_prompt_line("user@host:~$ cd /tmp"), "cd /tmp");
+        assert_eq!(
+            extract_command_from_prompt_line("user@host:~$ cd /tmp"),
+            "cd /tmp"
+        );
         assert_eq!(extract_command_from_prompt_line("root# ls -la"), "ls -la");
-        assert_eq!(extract_command_from_prompt_line("> echo hello"), "echo hello");
+        assert_eq!(
+            extract_command_from_prompt_line("> echo hello"),
+            "echo hello"
+        );
         assert_eq!(extract_command_from_prompt_line("ls"), "ls");
     }
 

@@ -1,4 +1,6 @@
-use iced::widget::{button, column, container, markdown, row, scrollable, text, text_editor, Space};
+use iced::widget::{
+    Space, button, column, container, markdown, row, scrollable, text, text_editor,
+};
 use iced::{Color, Element, Length, Theme};
 
 use crate::app::messages::Message;
@@ -54,19 +56,19 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     });
 
     let header_row: Element<'_, Message> = if is_markdown {
-        let preview_label = if document.markdown_preview { "Edit" } else { "Preview" };
-        let preview_button = button(
-            text(preview_label)
-                .size(12)
-                .color(Color::WHITE),
-        )
-        .on_press(Message::ToggleMarkdownPreview)
-        .padding([6, 14])
-        .style(if document.markdown_preview {
-            styles::primary_button
+        let preview_label = if document.markdown_preview {
+            "Edit"
         } else {
-            styles::ghost_button
-        });
+            "Preview"
+        };
+        let preview_button = button(text(preview_label).size(12).color(Color::WHITE))
+            .on_press(Message::ToggleMarkdownPreview)
+            .padding([6, 14])
+            .style(if document.markdown_preview {
+                styles::primary_button
+            } else {
+                styles::ghost_button
+            });
 
         row![
             column![
@@ -80,9 +82,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
             .width(Length::FillPortion(3)),
             Space::new().width(Length::Fill),
             column![
-                text(status_text)
-                    .size(11)
-                    .color(status_color),
+                text(status_text).size(11).color(status_color),
                 text(document.language.label())
                     .size(11)
                     .color(styles::blue_400()),
@@ -108,9 +108,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
             .width(Length::FillPortion(3)),
             Space::new().width(Length::Fill),
             column![
-                text(status_text)
-                    .size(11)
-                    .color(status_color),
+                text(status_text).size(11).color(status_color),
                 text(document.language.label())
                     .size(11)
                     .color(styles::blue_400()),
@@ -161,14 +159,10 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         .map(|url| Message::MarkdownLinkClicked(url.to_string()));
 
         container(
-            scrollable(
-                container(preview)
-                    .padding([16, 24])
-                    .width(Length::Fill),
-            )
-            .style(styles::dark_scrollable)
-            .width(Length::Fill)
-            .height(Length::Fill),
+            scrollable(container(preview).padding([16, 24]).width(Length::Fill))
+                .style(styles::dark_scrollable)
+                .width(Length::Fill)
+                .height(Length::Fill),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -176,33 +170,32 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         .into()
     } else {
         let path = document.path.clone();
-        let editor_content: Element<'_, Message> = if let Some(token) = document.language.syntax_token() {
-            text_editor(&document.buffer)
-                .on_action(move |action| Message::EditorAction(path.clone(), action))
-                .style(styles::dark_text_editor)
-                .padding([12, 14])
-                .size(14)
-                .height(Length::Fill)
-                .highlight(token, iced::highlighter::Theme::Base16Ocean)
-                .into()
-        } else {
-            text_editor(&document.buffer)
-                .on_action(move |action| Message::EditorAction(path.clone(), action))
-                .style(styles::dark_text_editor)
-                .padding([12, 14])
-                .size(14)
-                .height(Length::Fill)
-                .into()
-        };
+        let editor_content: Element<'_, Message> =
+            if let Some(token) = document.language.syntax_token() {
+                text_editor(&document.buffer)
+                    .on_action(move |action| Message::EditorAction(path.clone(), action))
+                    .style(styles::dark_text_editor)
+                    .padding([12, 14])
+                    .size(14)
+                    .height(Length::Fill)
+                    .highlight(token, iced::highlighter::Theme::Base16Ocean)
+                    .into()
+            } else {
+                text_editor(&document.buffer)
+                    .on_action(move |action| Message::EditorAction(path.clone(), action))
+                    .style(styles::dark_text_editor)
+                    .padding([12, 14])
+                    .size(14)
+                    .height(Length::Fill)
+                    .into()
+            };
 
-        container(
-            editor_content,
-        )
-        .padding([16, 18])
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style(styles::terminal_area)
-        .into()
+        container(editor_content)
+            .padding([16, 18])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(styles::terminal_area)
+            .into()
     };
 
     let footer = container(

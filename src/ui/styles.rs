@@ -128,7 +128,9 @@ pub fn sidebar_container(_theme: &Theme) -> container::Style {
 
 pub fn sidebar_header(_theme: &Theme) -> container::Style {
     container::Style {
-        background: Some(Background::Color(Color::from_rgba8(0xff, 0xff, 0xff, 0.015))),
+        background: Some(Background::Color(Color::from_rgba8(
+            0xff, 0xff, 0xff, 0.015,
+        ))),
         border: Border {
             color: border_subtle(),
             width: 1.0,
@@ -336,7 +338,9 @@ pub fn tab_active(_theme: &Theme) -> container::Style {
 
 pub fn workspace_tab_container(_theme: &Theme) -> container::Style {
     container::Style {
-        background: Some(Background::Color(Color::from_rgba8(0xff, 0xff, 0xff, 0.025))),
+        background: Some(Background::Color(Color::from_rgba8(
+            0xff, 0xff, 0xff, 0.025,
+        ))),
         border: Border {
             color: border_subtle(),
             width: 1.0,
@@ -348,7 +352,9 @@ pub fn workspace_tab_container(_theme: &Theme) -> container::Style {
 
 pub fn workspace_tab_active_container(_theme: &Theme) -> container::Style {
     container::Style {
-        background: Some(Background::Color(Color::from_rgba8(0xff, 0xff, 0xff, 0.065))),
+        background: Some(Background::Color(Color::from_rgba8(
+            0xff, 0xff, 0xff, 0.065,
+        ))),
         border: Border {
             color: Color::from_rgba8(0x3b, 0x82, 0xf6, 0.72),
             width: 1.0,
@@ -432,7 +438,9 @@ pub fn host_card_button(_theme: &Theme, status: button::Status) -> button::Style
         _ => Color::TRANSPARENT,
     };
     let border_color = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgba8(0xff, 0xff, 0xff, 0.07),
+        button::Status::Hovered | button::Status::Pressed => {
+            Color::from_rgba8(0xff, 0xff, 0xff, 0.07)
+        }
         _ => Color::TRANSPARENT,
     };
     button::Style {
@@ -513,7 +521,9 @@ pub fn file_entry_button(_theme: &Theme, status: button::Status) -> button::Styl
         _ => Color::TRANSPARENT,
     };
     let border_color = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgba8(0xff, 0xff, 0xff, 0.06),
+        button::Status::Hovered | button::Status::Pressed => {
+            Color::from_rgba8(0xff, 0xff, 0xff, 0.06)
+        }
         _ => Color::TRANSPARENT,
     };
     button::Style {
@@ -607,7 +617,9 @@ pub fn small_action_button(_theme: &Theme, status: button::Status) -> button::St
 
 pub fn context_menu_button(_theme: &Theme, status: button::Status) -> button::Style {
     let bg = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgba8(0xff, 0xff, 0xff, 0.08),
+        button::Status::Hovered | button::Status::Pressed => {
+            Color::from_rgba8(0xff, 0xff, 0xff, 0.08)
+        }
         _ => Color::TRANSPARENT,
     };
 
@@ -624,7 +636,9 @@ pub fn context_menu_button(_theme: &Theme, status: button::Status) -> button::St
 
 pub fn context_menu_danger_button(_theme: &Theme, status: button::Status) -> button::Style {
     let bg = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgba8(0xf8, 0x71, 0x71, 0.16),
+        button::Status::Hovered | button::Status::Pressed => {
+            Color::from_rgba8(0xf8, 0x71, 0x71, 0.16)
+        }
         _ => Color::TRANSPARENT,
     };
 
@@ -685,7 +699,9 @@ pub fn workspace_tab_close_button(_theme: &Theme, status: button::Status) -> but
 
 pub fn settings_option_button(_theme: &Theme, status: button::Status) -> button::Style {
     let bg = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgba8(0xff, 0xff, 0xff, 0.08),
+        button::Status::Hovered | button::Status::Pressed => {
+            Color::from_rgba8(0xff, 0xff, 0xff, 0.08)
+        }
         _ => Color::from_rgba8(0xff, 0xff, 0xff, 0.03),
     };
 
@@ -703,7 +719,9 @@ pub fn settings_option_button(_theme: &Theme, status: button::Status) -> button:
 
 pub fn settings_option_active_button(_theme: &Theme, status: button::Status) -> button::Style {
     let bg = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgba8(0x3b, 0x82, 0xf6, 0.34),
+        button::Status::Hovered | button::Status::Pressed => {
+            Color::from_rgba8(0x3b, 0x82, 0xf6, 0.34)
+        }
         _ => Color::from_rgba8(0x3b, 0x82, 0xf6, 0.24),
     };
 
@@ -915,28 +933,25 @@ pub fn auth_badge(
     label: &str,
     message: Message,
 ) -> iced::widget::Button<'_, Message> {
-    let btn = button(
-        text(label)
-            .size(13)
-            .color(if is_selected {
-                Color::WHITE
-            } else {
-                text_slate_400()
-            }),
-    )
+    let btn = button(text(label).size(13).color(if is_selected {
+        Color::WHITE
+    } else {
+        text_slate_400()
+    }))
     .padding([8, 16])
     .width(Length::Fill);
 
     if is_selected {
-        btn.on_press(message).style(|_theme, _status| button::Style {
-            background: Some(Background::Color(primary())),
-            text_color: Color::WHITE,
-            border: Border {
-                radius: 10.into(),
+        btn.on_press(message)
+            .style(|_theme, _status| button::Style {
+                background: Some(Background::Color(primary())),
+                text_color: Color::WHITE,
+                border: Border {
+                    radius: 10.into(),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        })
+            })
     } else {
         btn.on_press(message).style(|_theme, status| {
             let bg = match status {
@@ -958,7 +973,7 @@ pub fn auth_badge(
 }
 
 pub fn notifications(state: &AppState) -> Element<'_, Message> {
-    use iced::widget::{column, row, Space};
+    use iced::widget::{Space, column, row};
 
     if state.notifications.is_empty() {
         return Space::new().into();
@@ -1003,7 +1018,7 @@ pub fn notifications(state: &AppState) -> Element<'_, Message> {
         .height(Length::Fill)
         .padding([16, 16]),
     )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .into()
 }

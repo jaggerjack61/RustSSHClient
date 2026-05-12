@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use ssh2::Sftp;
-use walkdir::WalkDir;
 use tracing::warn;
+use walkdir::WalkDir;
 
 use crate::error::{AppError, AppResult};
 use crate::models::{FileEntry, FileKind, TransferDirection, TransferProgress, TransferStatus};
@@ -14,6 +14,7 @@ use super::file_tree::{format_permissions, infer_kind};
 
 const MAX_EDITOR_BYTES: usize = 512 * 1024;
 const MAX_REMOTE_RECURSION_DEPTH: usize = 64;
+const TRANSFER_PROGRESS_REPORT_BYTES: u64 = 256 * 1024;
 
 pub fn list_directory(sftp: &Sftp, path: &str) -> AppResult<Vec<FileEntry>> {
     let mut entries = sftp
@@ -22,12 +23,15 @@ pub fn list_directory(sftp: &Sftp, path: &str) -> AppResult<Vec<FileEntry>> {
         .filter_map(|(entry_path, stat)| file_entry_from_dirent(sftp, entry_path, stat))
         .collect::<Vec<_>>();
 
-    entries.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
-    entries.sort_by_key(|entry| !entry.is_directory());
+    entries.sort_by_cached_key(|entry| (!entry.is_directory(), entry.name.to_lowercase()));
     Ok(entries)
 }
 
-fn file_entry_from_dirent(sftp: &Sftp, entry_path: PathBuf, stat: ssh2::FileStat) -> Option<FileEntry> {
+fn file_entry_from_dirent(
+    sftp: &Sftp,
+    entry_path: PathBuf,
+    stat: ssh2::FileStat,
+) -> Option<FileEntry> {
     let name = entry_path.file_name()?.to_str()?.to_string();
     if name == "." || name == ".." {
         return None;
@@ -93,7 +97,9 @@ pub fn read_text_file(sftp: &Sftp, path: &str) -> AppResult<String> {
     let stat = sftp.stat(file_path)?;
 
     if remote_kind(sftp, file_path, stat.perm).eq(&FileKind::Directory) {
-        return Err(AppError::Sftp("Cannot open a directory in the editor.".into()));
+        return Err(AppError::Sftp(
+            "Cannot open a directory in the editor.".into(),
+        ));
     }
 
     if let Some(size) = stat.size {
@@ -116,8 +122,7 @@ pub fn read_text_file(sftp: &Sftp, path: &str) -> AppResult<String> {
         )));
     }
 
-    String::from_utf8(bytes)
-        .map_err(|_| AppError::Sftp("File is not valid UTF-8 text.".into()))
+    String::from_utf8(bytes).map_err(|_| AppError::Sftp("File is not valid UTF-8 text.".into()))
 }
 
 pub fn write_text_file(sftp: &Sftp, path: &str, content: &str) -> AppResult<()> {
@@ -125,7 +130,9 @@ pub fn write_text_file(sftp: &Sftp, path: &str, content: &str) -> AppResult<()> 
 
     if let Ok(stat) = sftp.stat(file_path) {
         if remote_kind(sftp, file_path, stat.perm).eq(&FileKind::Directory) {
-            return Err(AppError::Sftp("Cannot save editor contents into a directory.".into()));
+            return Err(AppError::Sftp(
+                "Cannot save editor contents into a directory.".into(),
+            ));
         }
     }
 
@@ -172,7 +179,8 @@ fn copy_entry_with_progress(
         for (child_path, _) in sftp.readdir(Path::new(source))? {
             let Some(name) = child_path.file_name().and_then(|value| value.to_str()) else {
                 return Err(AppError::Sftp(
-                    "Remote directory entry contains non-UTF-8 text and cannot be copied safely.".into(),
+                    "Remote directory entry contains non-UTF-8 text and cannot be copied safely."
+                        .into(),
                 ));
             };
             if name == "." || name == ".." {
@@ -231,7 +239,14 @@ where
             .file_name()
             .ok_or_else(|| AppError::Sftp("Local path has no file name.".into()))?;
         let remote_path = Path::new(remote_directory).join(file_name);
-        upload_single_path(sftp, local_path, &remote_path, transfer, &mut on_progress, 0)?;
+        upload_single_path(
+            sftp,
+            local_path,
+            &remote_path,
+            transfer,
+            &mut on_progress,
+            0,
+        )?;
     }
 
     transfer.status = TransferStatus::Completed;
@@ -380,6 +395,7 @@ where
     W: Write,
 {
     let mut buffer = [0_u8; 32 * 1024];
+    let mut last_reported_bytes = transfer.transferred_bytes;
 
     loop {
         let read = reader.read(&mut buffer)?;
@@ -390,11 +406,24 @@ where
         writer.write_all(&buffer[..read])?;
         transfer.transferred_bytes = transfer.transferred_bytes.saturating_add(read as u64);
         transfer.status = TransferStatus::Running;
-        on_progress(transfer);
+        if should_report_transfer_progress(transfer, last_reported_bytes) {
+            on_progress(transfer);
+            last_reported_bytes = transfer.transferred_bytes;
+        }
     }
 
     writer.flush()?;
     Ok(())
+}
+
+fn should_report_transfer_progress(transfer: &TransferProgress, last_reported_bytes: u64) -> bool {
+    let unreported_bytes = transfer
+        .transferred_bytes
+        .saturating_sub(last_reported_bytes);
+    unreported_bytes >= TRANSFER_PROGRESS_REPORT_BYTES
+        || (transfer.total_bytes > 0
+            && transfer.transferred_bytes >= transfer.total_bytes
+            && transfer.transferred_bytes != last_reported_bytes)
 }
 
 fn local_total_size(path: &Path) -> AppResult<u64> {
@@ -423,15 +452,13 @@ fn remote_total_size(sftp: &Sftp, path: &Path) -> AppResult<u64> {
 }
 
 fn remote_kind(sftp: &Sftp, path: &Path, perm: Option<u32>) -> FileKind {
-    let kind = infer_kind(perm);
-    if kind != FileKind::Other || perm.is_some() {
-        return kind;
+    if perm.is_some() {
+        return infer_kind(perm);
     }
 
-    if sftp.opendir(path).is_ok() {
-        FileKind::Directory
-    } else {
-        FileKind::File
+    match sftp.opendir(path) {
+        Ok(_) => FileKind::Directory,
+        Err(_) => FileKind::File,
     }
 }
 
@@ -442,7 +469,8 @@ fn delete_entry_with_depth(sftp: &Sftp, path: &str, depth: usize) -> AppResult<(
         for (child_path, _) in sftp.readdir(Path::new(path))? {
             let Some(name) = child_path.file_name().and_then(|value| value.to_str()) else {
                 return Err(AppError::Sftp(
-                    "Remote directory entry contains non-UTF-8 text and cannot be deleted safely.".into(),
+                    "Remote directory entry contains non-UTF-8 text and cannot be deleted safely."
+                        .into(),
                 ));
             };
             if name == "." || name == ".." {
@@ -499,4 +527,34 @@ fn ensure_recursion_budget(depth: usize) -> AppResult<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use crate::models::{TransferDirection, TransferProgress, TransferStatus};
+
+    #[test]
+    fn stream_copy_throttles_progress_updates() {
+        let payload = vec![7_u8; 1024 * 1024];
+        let mut reader = Cursor::new(payload);
+        let mut writer = Vec::new();
+        let mut transfer =
+            TransferProgress::queued("large.bin", TransferDirection::Upload, 1024 * 1024);
+        transfer.status = TransferStatus::Running;
+        let mut update_count = 0;
+
+        super::stream_copy(&mut reader, &mut writer, &mut transfer, &mut |progress| {
+            assert!(matches!(progress.status, TransferStatus::Running));
+            update_count += 1;
+        })
+        .expect("copy payload");
+
+        assert_eq!(writer.len(), 1024 * 1024);
+        assert!(
+            update_count <= 5,
+            "expected throttled progress updates, got {update_count}"
+        );
+    }
 }

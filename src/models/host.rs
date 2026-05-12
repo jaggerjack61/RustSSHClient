@@ -168,7 +168,9 @@ impl HostRecord {
     }
 
     pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
-        self.expires_at.map(|expires_at| expires_at <= now).unwrap_or(false)
+        self.expires_at
+            .map(|expires_at| expires_at <= now)
+            .unwrap_or(false)
     }
 }
 

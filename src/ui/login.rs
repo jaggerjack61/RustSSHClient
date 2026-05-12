@@ -1,4 +1,6 @@
-use iced::widget::{button, checkbox, column, container, row, scrollable, stack, text, text_input, Space};
+use iced::widget::{
+    Space, button, checkbox, column, container, row, scrollable, stack, text, text_input,
+};
 use iced::{Color, Element, Length};
 
 use crate::app::messages::Message;
@@ -39,9 +41,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     // Username + Port row
     let user_port_row = row![
         column![
-            text("USERNAME")
-                .size(10)
-                .color(styles::text_slate_500()),
+            text("USERNAME").size(10).color(styles::text_slate_500()),
             text_input("root", &state.login.username)
                 .on_input(Message::LoginUsernameChanged)
                 .padding([14, 16])
@@ -51,9 +51,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         .spacing(8)
         .width(Length::FillPortion(2)),
         column![
-            text("PORT")
-                .size(10)
-                .color(styles::text_slate_500()),
+            text("PORT").size(10).color(styles::text_slate_500()),
             text_input("22", &state.login.port)
                 .on_input(Message::LoginPortChanged)
                 .padding([14, 16])
@@ -109,41 +107,33 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                 let is_selected = state.login.selected_key == Some(key.id);
                 key_list = key_list.push(
                     row![
-                        button(
-                            text(&key.label)
-                                .size(13)
-                                .color(if is_selected {
-                                    Color::WHITE
-                                } else {
-                                    styles::text_slate_400()
-                                }),
-                        )
+                        button(text(&key.label).size(13).color(if is_selected {
+                            Color::WHITE
+                        } else {
+                            styles::text_slate_400()
+                        }),)
                         .on_press(Message::SelectKey(key.id))
                         .padding([8, 12])
                         .width(Length::Fill)
                         .style(if is_selected {
-                            styles::host_card_active as fn(&iced::Theme, button::Status) -> button::Style
+                            styles::host_card_active
+                                as fn(&iced::Theme, button::Status) -> button::Style
                         } else {
                             styles::ghost_button
                         }),
-                        button(
-                            text("\u{2715}").size(12).color(styles::text_slate_500()),
-                        )
-                        .on_press(Message::DeleteKey(key.id))
-                        .padding([8, 0])
-                        .width(Length::Fixed(36.0))
-                        .style(styles::ghost_button),
+                        button(text("\u{2715}").size(12).color(styles::text_slate_500()),)
+                            .on_press(Message::DeleteKey(key.id))
+                            .padding([8, 0])
+                            .width(Length::Fixed(36.0))
+                            .style(styles::ghost_button),
                     ]
                     .spacing(8)
                     .align_y(iced::Alignment::Center),
                 );
             }
 
-            auth_section = auth_section.push(
-                text("SSH KEYS")
-                    .size(10)
-                    .color(styles::text_slate_500()),
-            );
+            auth_section =
+                auth_section.push(text("SSH KEYS").size(10).color(styles::text_slate_500()));
 
             if state.keys.is_empty() {
                 auth_section = auth_section.push(
@@ -161,14 +151,10 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
             }
 
             auth_section = auth_section.push(
-                button(
-                    text("Import PEM Key")
-                        .size(13)
-                        .color(styles::primary()),
-                )
-                .on_press(Message::ImportKeyPressed)
-                .padding([8, 16])
-                .style(styles::ghost_button),
+                button(text("Import PEM Key").size(13).color(styles::primary()))
+                    .on_press(Message::ImportKeyPressed)
+                    .padding([8, 16])
+                    .style(styles::ghost_button),
             );
         }
     }
@@ -184,9 +170,12 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
             .text_size(14),
         Space::new().width(Length::Fill),
         button(
-            text(format!("Advanced Settings · {}", state.login.save_lifetime.label()))
-                .size(12)
-                .color(styles::primary()),
+            text(format!(
+                "Advanced Settings · {}",
+                state.login.save_lifetime.label()
+            ))
+            .size(12)
+            .color(styles::primary()),
         )
         .on_press(Message::OpenAdvancedSettings)
         .style(styles::accent_link_button),
@@ -202,13 +191,9 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     };
 
     let connect_button = button(
-        container(
-            text(connect_label)
-                .size(16)
-                .color(Color::WHITE),
-        )
-        .center_x(Length::Fill)
-        .center_y(Length::Shrink),
+        container(text(connect_label).size(16).color(Color::WHITE))
+            .center_x(Length::Fill)
+            .center_y(Length::Shrink),
     )
     .on_press_maybe((!state.login.connecting).then_some(Message::ConnectPressed))
     .padding([16, 24])
@@ -218,14 +203,10 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     // Security badges
     let security_badges = row![
         text("\u{1F6E1}").size(12).color(styles::accent()),
-        text("AES-256")
-            .size(11)
-            .color(styles::text_slate_500()),
+        text("AES-256").size(11).color(styles::text_slate_500()),
         text("\u{00B7}").size(14).color(styles::text_slate_600()),
         text("\u{1F511}").size(12).color(styles::accent()),
-        text("SSH KEY")
-            .size(11)
-            .color(styles::text_slate_500()),
+        text("SSH KEY").size(11).color(styles::text_slate_500()),
     ]
     .spacing(6)
     .align_y(iced::Alignment::Center);
@@ -235,12 +216,9 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         .align_y(iced::Alignment::Center);
 
     let card_meta = container(
-        column![
-            security_badges,
-            footer_links,
-        ]
-        .spacing(10)
-        .align_x(iced::Alignment::Center),
+        column![security_badges, footer_links,]
+            .spacing(10)
+            .align_x(iced::Alignment::Center),
     )
     .width(Length::Fill)
     .center_x(Length::Fill)
@@ -249,9 +227,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     // --- Assemble form card ---
     let form = column![
         // Title
-        text("New Connection")
-            .size(30)
-            .color(Color::WHITE),
+        text("New Connection").size(30).color(Color::WHITE),
         text("Enter server credentials to begin session")
             .size(14)
             .color(styles::text_slate_400()),
@@ -269,18 +245,16 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     .align_x(iced::Alignment::Start);
 
     let card = container(form)
-    .width(Length::Fill)
-    .max_width(460)
-    .padding([26, 30])
-    .style(styles::glass_card);
+        .width(Length::Fill)
+        .max_width(460)
+        .padding([26, 30])
+        .style(styles::glass_card);
 
     // --- Main content area ---
     let main_content = container(
         column![
             Space::new().height(Length::Fill),
-            container(card)
-                .width(Length::Fill)
-                .center_x(Length::Fill),
+            container(card).width(Length::Fill).center_x(Length::Fill),
             Space::new().height(Length::Fill),
         ]
         .width(Length::Fill)
@@ -332,59 +306,55 @@ fn footer_link_button<'a>(spec: FooterLinkSpec) -> Element<'a, Message> {
 }
 
 fn advanced_settings_modal(state: &AppState) -> Element<'_, Message> {
-    let lifetime_options = SaveLifetime::ALL.into_iter().fold(
-        column![].spacing(10),
-        |column, lifetime| {
-            let is_selected = state.login.save_lifetime == lifetime;
-            let label = if is_selected {
-                format!("{}  •  Active", lifetime.label())
-            } else {
-                lifetime.label().to_string()
-            };
-
-            column.push(
-                button(
-                    row![
-                        column![
-                            text(label)
-                                .size(15)
-                                .color(Color::WHITE),
-                            text(lifetime.detail())
-                                .size(12)
-                                .color(styles::text_slate_400()),
-                        ]
-                        .spacing(4)
-                        .width(Length::Fill),
-                        text(if is_selected { "KEEP" } else { "SET" })
-                            .size(10)
-                            .color(if is_selected {
-                                styles::blue_400()
-                            } else {
-                                styles::text_slate_500()
-                            }),
-                    ]
-                    .spacing(12)
-                    .align_y(iced::Alignment::Center),
-                )
-                .on_press(Message::SelectSaveLifetime(lifetime))
-                .padding([14, 16])
-                .width(Length::Fill)
-                .style(if is_selected {
-                    styles::settings_option_active_button
+    let lifetime_options =
+        SaveLifetime::ALL
+            .into_iter()
+            .fold(column![].spacing(10), |column, lifetime| {
+                let is_selected = state.login.save_lifetime == lifetime;
+                let label = if is_selected {
+                    format!("{}  •  Active", lifetime.label())
                 } else {
-                    styles::settings_option_button
-                }),
-            )
-        },
-    );
+                    lifetime.label().to_string()
+                };
+
+                column.push(
+                    button(
+                        row![
+                            column![
+                                text(label).size(15).color(Color::WHITE),
+                                text(lifetime.detail())
+                                    .size(12)
+                                    .color(styles::text_slate_400()),
+                            ]
+                            .spacing(4)
+                            .width(Length::Fill),
+                            text(if is_selected { "KEEP" } else { "SET" })
+                                .size(10)
+                                .color(if is_selected {
+                                    styles::blue_400()
+                                } else {
+                                    styles::text_slate_500()
+                                }),
+                        ]
+                        .spacing(12)
+                        .align_y(iced::Alignment::Center),
+                    )
+                    .on_press(Message::SelectSaveLifetime(lifetime))
+                    .padding([14, 16])
+                    .width(Length::Fill)
+                    .style(if is_selected {
+                        styles::settings_option_active_button
+                    } else {
+                        styles::settings_option_button
+                    }),
+                )
+            });
 
     let panel = container(
         column![
             row![
                 column![
-                    text("Credential Retention")
-                        .size(26)
-                        .color(Color::WHITE),
+                    text("Credential Retention").size(26).color(Color::WHITE),
                     text("Decide how long saved logins stay in the local encrypted vault.")
                         .size(13)
                         .color(styles::text_slate_400()),
@@ -410,9 +380,7 @@ fn advanced_settings_modal(state: &AppState) -> Element<'_, Message> {
                     .spacing(6)
                     .width(Length::FillPortion(2)),
                     column![
-                        text("BEHAVIOR")
-                            .size(10)
-                            .color(styles::text_slate_500()),
+                        text("BEHAVIOR").size(10).color(styles::text_slate_500()),
                         text(if state.login.save_connection {
                             "Applied to newly saved or updated credentials"
                         } else {
@@ -437,14 +405,10 @@ fn advanced_settings_modal(state: &AppState) -> Element<'_, Message> {
                         .width(Length::Fill),
                     row![
                         Space::new().width(Length::Fill),
-                        button(
-                            text("Done")
-                                .size(13)
-                                .color(Color::WHITE),
-                        )
-                        .on_press(Message::CloseAdvancedSettings)
-                        .padding([10, 18])
-                        .style(styles::primary_button),
+                        button(text("Done").size(13).color(Color::WHITE),)
+                            .on_press(Message::CloseAdvancedSettings)
+                            .padding([10, 18])
+                            .style(styles::primary_button),
                     ]
                     .align_y(iced::Alignment::Center),
                 ]

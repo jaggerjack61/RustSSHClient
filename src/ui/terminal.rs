@@ -1,5 +1,7 @@
 use iced::font::{Style as FontStyle, Weight};
-use iced::widget::{button, column, container, progress_bar, rich_text, row, scrollable, span, text, Space};
+use iced::widget::{
+    Space, button, column, container, progress_bar, rich_text, row, scrollable, span, text,
+};
 use iced::{Background, Color, Element, Font, Length};
 
 use crate::app::messages::Message;
@@ -16,14 +18,16 @@ pub fn workspace_view(state: &AppState) -> Element<'_, Message> {
         WorkspaceTab::Editor(_) => editor::view(state),
     };
 
-    let content = column![row![
-        file_tree::view(state),
-        column![tab_bar, panel_body]
-            .width(Length::Fill)
-            .height(Length::Fill),
+    let content = column![
+        row![
+            file_tree::view(state),
+            column![tab_bar, panel_body]
+                .width(Length::Fill)
+                .height(Length::Fill),
+        ]
+        .width(Length::Fill)
+        .height(Length::Fill)
     ]
-    .width(Length::Fill)
-    .height(Length::Fill)]
     .height(Length::Fill);
 
     container(content)
@@ -41,21 +45,23 @@ fn workspace_tab_bar(state: &AppState) -> Element<'_, Message> {
         state.workspace.connected_peer.clone()
     };
     let bash_tab = container(
-        row![button(
-            row![
-                text(">_").size(11).color(Color::WHITE),
-                text("bash").size(12).color(Color::WHITE),
-            ]
-            .spacing(6)
-            .align_y(iced::Alignment::Center),
-        )
-        .on_press(Message::ActivateTerminalTab)
-        .padding([6, 14])
-        .style(if bash_active {
-            styles::workspace_tab_active_button
-        } else {
-            styles::workspace_tab_button
-        })]
+        row![
+            button(
+                row![
+                    text(">_").size(11).color(Color::WHITE),
+                    text("bash").size(12).color(Color::WHITE),
+                ]
+                .spacing(6)
+                .align_y(iced::Alignment::Center),
+            )
+            .on_press(Message::ActivateTerminalTab)
+            .padding([6, 14])
+            .style(if bash_active {
+                styles::workspace_tab_active_button
+            } else {
+                styles::workspace_tab_button
+            })
+        ]
         .align_y(iced::Alignment::Center),
     )
     .style(if bash_active {
@@ -193,32 +199,28 @@ fn terminal_panel(state: &AppState) -> Element<'_, Message> {
             ]
             .spacing(8),
         )
-            .padding([16, 10])
-            .width(Length::Fill)
-            .into()
+        .padding([16, 10])
+        .width(Length::Fill)
+        .into()
     };
 
     let status_bar = container(
         container(
             row![
                 row![
-                    container(Space::new().width(5).height(5)).style(|_theme: &iced::Theme| container::Style {
-                        background: Some(iced::Background::Color(styles::primary())),
-                        border: iced::Border {
-                            radius: 3.into(),
+                    container(Space::new().width(5).height(5)).style(|_theme: &iced::Theme| {
+                        container::Style {
+                            background: Some(iced::Background::Color(styles::primary())),
+                            border: iced::Border {
+                                radius: 3.into(),
+                                ..Default::default()
+                            },
                             ..Default::default()
-                        },
-                        ..Default::default()
+                        }
                     }),
-                    text("Live shell")
-                        .size(11)
-                        .color(styles::text_slate_300()),
-                    text("UTF-8")
-                        .size(11)
-                        .color(styles::text_slate_500()),
-                    text("SSHv2")
-                        .size(11)
-                        .color(styles::text_slate_500()),
+                    text("Live shell").size(11).color(styles::text_slate_300()),
+                    text("UTF-8").size(11).color(styles::text_slate_500()),
+                    text("SSHv2").size(11).color(styles::text_slate_500()),
                 ]
                 .spacing(12)
                 .align_y(iced::Alignment::Center),
@@ -232,14 +234,10 @@ fn terminal_panel(state: &AppState) -> Element<'_, Message> {
                         .on_press(Message::CopyTerminalOutput)
                         .padding([4, 8])
                         .style(styles::status_bar_button),
-                    button(
-                        text("New Session")
-                            .size(11)
-                            .color(styles::primary()),
-                    )
-                    .on_press(Message::DisconnectPressed)
-                    .padding([4, 8])
-                    .style(styles::new_session_button),
+                    button(text("New Session").size(11).color(styles::primary()),)
+                        .on_press(Message::DisconnectPressed)
+                        .padding([4, 8])
+                        .style(styles::new_session_button),
                 ]
                 .spacing(12),
             ]
@@ -253,14 +251,10 @@ fn terminal_panel(state: &AppState) -> Element<'_, Message> {
     .width(Length::Fill)
     .style(styles::status_bar);
 
-    column![
-        terminal_output,
-        transfers,
-        status_bar,
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    column![terminal_output, transfers, status_bar,]
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }
 
 fn terminal_spans(state: &AppState) -> Vec<iced::widget::text::Span<'static>> {
@@ -291,9 +285,8 @@ fn terminal_spans(state: &AppState) -> Vec<iced::widget::text::Span<'static>> {
             }
 
             if let Some((red, green, blue)) = segment.background {
-                text_span = text_span.background(Background::Color(Color::from_rgb8(
-                    red, green, blue,
-                )));
+                text_span =
+                    text_span.background(Background::Color(Color::from_rgb8(red, green, blue)));
             }
 
             text_span
