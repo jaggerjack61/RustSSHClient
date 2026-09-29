@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use iced::Event;
 use iced::widget::text_editor;
+use iced::{Event, Size, mouse};
 use uuid::Uuid;
 
 use crate::models::{HostSort, SaveLifetime, SshKeyRecord};
-use crate::ssh::session::SessionHandle;
+use crate::ssh::session::{SessionEvent, SessionHandle};
 use crate::storage::StorageSnapshot;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,66 +14,91 @@ pub enum FileActionKind {
     Rename,
     Copy,
     Move,
+    NewFolder,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     StorageLoaded(Result<StorageSnapshot, String>),
+
+    // Connection form
     LoginLabelChanged(String),
     LoginHostChanged(String),
     LoginPortChanged(String),
     LoginUsernameChanged(String),
     LoginPasswordChanged(String),
+    TogglePasswordVisibility,
     ToggleSaveConnection(bool),
     UsePasswordAuthentication,
     UseKeyAuthentication,
-    ToggleKeyManager,
-    OpenAdvancedSettings,
-    CloseAdvancedSettings,
     SelectSaveLifetime(SaveLifetime),
-    OpenProjectLink,
+    NewConnection,
     ConnectPressed,
     SessionSpawned(Result<SessionHandle, String>),
-    HostCardPressed(Uuid),
-    DeleteHost(Uuid),
-    EditHost(Uuid),
+    CancelConnect,
+    OpenProjectLink,
+    OpenIssuesLink,
+
+    // Saved hosts and keys
+    HostFilterChanged(String),
     HostSortChanged(HostSort),
+    HostSelected(Uuid),
+    HostActivated(Uuid),
+    DeleteHost(Uuid),
     SelectKey(Uuid),
     DeleteKey(Uuid),
     ImportKeyPressed,
     KeyImported(Result<Option<SshKeyRecord>, String>),
+
+    // Session plumbing
+    Session { id: u64, event: SessionEvent },
+    HostKeyDecision(bool),
     Tick(Instant),
     RuntimeEvent(Event),
+
+    // Terminal
+    TerminalViewportResized(Size),
+    TerminalScrolled(mouse::ScrollDelta),
+    TerminalScrollToBottom,
     ClearTerminal,
     CopyTerminalOutput,
     PasteTerminalInput,
     DisconnectPressed,
+
+    // Explorer
     RefreshDirectory,
     NavigateUpDirectory,
-    DismissExplorerContextMenu,
+    NavigateHome,
+    NavigateTo(String),
     ExplorerEntryPressed(String),
     ExplorerEntryDoubleClicked(String),
     ExplorerEntrySecondaryPressed(String),
-    ToggleExpandedFolder(String),
+    ExplorerScrolled(f32),
+    DismissExplorerContextMenu,
     ShowProperties,
-    DismissProperties,
     OpenSelectedFileInEditor,
+    UploadRequested,
+    FilesSelected(Option<Vec<PathBuf>>),
+    DownloadRequested,
+    DownloadDirectorySelected(Option<PathBuf>),
+    DeleteSelectedFile,
+    StartFileAction(FileActionKind),
+    FileActionInputChanged(String),
+    ConfirmFileAction,
+    ToggleTransfersPanel,
+    ClearFinishedTransfers,
+
+    // Editor
     EditorAction(String, text_editor::Action),
     SaveActiveEditor,
     ActivateTerminalTab,
     ActivateEditorTab(String),
     CloseEditorTab(String),
-    WindowResized(f32, f32),
-    UploadRequested,
-    FilesSelected(Option<Vec<PathBuf>>),
-    DownloadDirectorySelected(Option<PathBuf>),
-    DownloadRequested,
-    DeleteSelectedFile,
-    StartFileAction(FileActionKind),
-    FileActionInputChanged(String),
-    ConfirmFileAction,
-    CancelFileAction,
-    DismissNotification(usize),
     ToggleMarkdownPreview,
     MarkdownLinkClicked(String),
+
+    // Dialogs and toasts
+    ConfirmModal,
+    CloseModal,
+    DismissNotification(u64),
 }

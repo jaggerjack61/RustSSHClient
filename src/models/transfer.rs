@@ -42,6 +42,13 @@ impl TransferProgress {
         }
     }
 
+    pub fn is_finished(&self) -> bool {
+        matches!(
+            self.status,
+            TransferStatus::Completed | TransferStatus::Failed(_)
+        )
+    }
+
     pub fn percent_complete(&self) -> f32 {
         if matches!(self.status, TransferStatus::Completed) {
             return 1.0;

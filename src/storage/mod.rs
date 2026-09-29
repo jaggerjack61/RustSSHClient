@@ -29,10 +29,23 @@ pub struct StorageFacade {
     root: PathBuf,
 }
 
+impl Default for StorageFacade {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StorageFacade {
+    /// Uses `RUSTSSH_DATA_DIR` when set (portable installs, testing),
+    /// otherwise the platform's local data directory.
     pub fn new() -> Self {
-        let root = ProjectDirs::from(APP_QUALIFIER, APP_ORGANIZATION, APP_NAME)
-            .map(|dirs| dirs.data_local_dir().to_path_buf())
+        let root = std::env::var_os("RUSTSSH_DATA_DIR")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| {
+                ProjectDirs::from(APP_QUALIFIER, APP_ORGANIZATION, APP_NAME)
+                    .map(|dirs| dirs.data_local_dir().to_path_buf())
+            })
             .unwrap_or_else(|| PathBuf::from(".rustssh"));
 
         Self { root }
@@ -44,6 +57,11 @@ impl StorageFacade {
 
     pub fn root(&self) -> &PathBuf {
         &self.root
+    }
+
+    /// OpenSSH-format file holding host keys trusted by this app.
+    pub fn known_hosts_path(&self) -> PathBuf {
+        self.root.join("known_hosts")
     }
 
     pub fn load_snapshot(&self) -> AppResult<StorageSnapshot> {

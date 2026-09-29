@@ -14,6 +14,9 @@ pub struct FileEntry {
     pub name: String,
     pub path: String,
     pub kind: FileKind,
+    /// Whether the entry is a symbolic link. `kind` describes the link target.
+    #[serde(default)]
+    pub is_symlink: bool,
     pub size: u64,
     pub permissions: String,
     pub owner: Option<String>,

@@ -1,6 +1,9 @@
+pub mod components;
 pub mod editor;
 pub mod file_tree;
 pub mod host_list;
 pub mod login;
-pub mod styles;
+pub mod modals;
 pub mod terminal;
+pub mod theme;
+pub mod workspace;

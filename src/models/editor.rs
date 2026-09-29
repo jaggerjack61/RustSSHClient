@@ -110,6 +110,10 @@ pub struct EditorDocument {
     pub load_error: Option<String>,
     pub markdown_preview: bool,
     pub markdown_items: Vec<markdown::Item>,
+    /// Size of the current buffer in bytes, refreshed on edits.
+    pub byte_len: usize,
+    /// Text of the save currently in flight.
+    pending_save: Option<String>,
 }
 
 impl EditorDocument {
@@ -129,6 +133,8 @@ impl EditorDocument {
             load_error: None,
             markdown_preview: false,
             markdown_items: Vec::new(),
+            byte_len: 0,
+            pending_save: None,
         }
     }
 
@@ -137,6 +143,7 @@ impl EditorDocument {
             self.markdown_items = markdown::parse(&content).collect();
         }
         self.buffer = text_editor::Content::with_text(&content);
+        self.byte_len = content.len();
         self.saved_content = content;
         self.is_loading = false;
         self.is_saving = false;
@@ -146,6 +153,7 @@ impl EditorDocument {
 
     pub fn set_error(&mut self, error: String) {
         self.buffer = text_editor::Content::new();
+        self.byte_len = 0;
         self.saved_content.clear();
         self.is_loading = false;
         self.is_saving = false;
@@ -154,21 +162,42 @@ impl EditorDocument {
     }
 
     pub fn apply_action(&mut self, action: text_editor::Action) {
+        let is_edit = action.is_edit();
         self.buffer.perform(action);
-        self.is_dirty = self.buffer.text() != self.saved_content;
+
+        // Cursor moves, selection and scrolling can't change the text, so
+        // skip the full-buffer comparison for them.
+        if is_edit {
+            let text = self.buffer.text();
+            self.byte_len = text.len();
+            self.is_dirty = text != self.saved_content;
+        }
     }
 
-    pub fn mark_saving(&mut self) {
+    /// 1-based line and column of the cursor.
+    pub fn cursor_position(&self) -> (usize, usize) {
+        let position = self.buffer.cursor().position;
+        (position.line + 1, position.column + 1)
+    }
+
+    /// Marks a save of `contents` as in flight.
+    pub fn mark_saving(&mut self, contents: String) {
+        self.pending_save = Some(contents);
         self.is_saving = true;
     }
 
+    /// Records that the in-flight save completed. Edits made while it was in
+    /// flight keep the document dirty.
     pub fn mark_saved(&mut self) {
-        self.saved_content = self.buffer.text();
+        if let Some(contents) = self.pending_save.take() {
+            self.saved_content = contents;
+        }
         self.is_saving = false;
-        self.is_dirty = false;
+        self.is_dirty = self.buffer.text() != self.saved_content;
     }
 
     pub fn mark_save_failed(&mut self) {
+        self.pending_save = None;
         self.is_saving = false;
         self.is_dirty = self.buffer.text() != self.saved_content;
     }
@@ -228,5 +257,31 @@ mod tests {
 
         assert!(document.is_dirty);
         assert_eq!(document.current_text(), "web: serve\n!");
+    }
+
+    #[test]
+    fn edits_made_during_a_save_stay_dirty() {
+        let mut document = EditorDocument::new_loading("/srv/app/Procfile");
+        document.apply_content("a".into());
+        document.apply_action(text_editor::Action::Move(text_editor::Motion::DocumentEnd));
+        document.apply_action(text_editor::Action::Edit(text_editor::Edit::Insert('b')));
+        document.mark_saving(document.current_text());
+        document.apply_action(text_editor::Action::Edit(text_editor::Edit::Insert('c')));
+
+        document.mark_saved();
+
+        assert_eq!(document.saved_content, "ab");
+        assert!(document.is_dirty);
+        assert_eq!(document.byte_len, 3);
+    }
+
+    #[test]
+    fn cursor_moves_do_not_mark_document_dirty() {
+        let mut document = EditorDocument::new_loading("/srv/app/Procfile");
+        document.apply_content("line one\nline two".into());
+        document.apply_action(text_editor::Action::Move(text_editor::Motion::DocumentEnd));
+
+        assert!(!document.is_dirty);
+        assert_eq!(document.cursor_position(), (2, 9));
     }
 }

@@ -3,28 +3,45 @@ pub mod state;
 pub mod update;
 pub mod view;
 
-use iced::Theme;
+use iced::{Size, Theme, window};
 
 use state::AppState;
 
+use crate::ui::theme;
+
 fn application_theme(_: &AppState) -> Theme {
-    Theme::Dark
+    theme::app_theme()
 }
 
 fn application_title(state: &AppState) -> String {
-    match state.is_connected() {
-        true => format!("RustSSH Client - {}", state.workspace.current_directory),
-        false => "RustSSH Client".to_string(),
+    if state.is_connected() {
+        let user = state.login.username.trim();
+        format!(
+            "{user}@{}: {} \u{2014} RustSSH",
+            state.workspace.connected_peer, state.workspace.current_directory
+        )
+    } else {
+        "RustSSH".to_string()
     }
 }
 
 pub fn run() -> iced::Result {
-    iced::application(AppState::boot, update::update, view::view)
+    let mut application = iced::application(AppState::boot, update::update, view::view)
         .subscription(update::subscription)
         .theme(application_theme)
         .title(application_title)
-        .window_size([1200.0, 780.0])
-        .centered()
-        .antialiasing(true)
-        .run()
+        .default_font(theme::UI_FONT)
+        .window(window::Settings {
+            size: Size::new(1280.0, 800.0),
+            min_size: Some(Size::new(900.0, 560.0)),
+            position: window::Position::Centered,
+            ..window::Settings::default()
+        })
+        .antialiasing(true);
+
+    for font in theme::FONTS {
+        application = application.font(font);
+    }
+
+    application.run()
 }

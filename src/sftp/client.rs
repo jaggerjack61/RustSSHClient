@@ -45,10 +45,22 @@ fn file_entry_from_dirent(
         }
     };
 
+    // `readdir` reports link attributes; resolve symlinks so linked
+    // directories can be browsed like regular ones.
+    let mut kind = remote_kind(sftp, &entry_path, stat.perm);
+    let is_symlink = kind == FileKind::Symlink;
+    if is_symlink {
+        kind = match sftp.stat(&entry_path) {
+            Ok(target) if infer_kind(target.perm) == FileKind::Directory => FileKind::Directory,
+            _ => FileKind::File,
+        };
+    }
+
     Some(FileEntry {
         name,
         path,
-        kind: remote_kind(sftp, &entry_path, stat.perm),
+        kind,
+        is_symlink,
         size: stat.size.unwrap_or_default(),
         permissions: format_permissions(stat.perm),
         owner: stat.uid.map(|uid| uid.to_string()),
@@ -72,13 +84,7 @@ pub fn ensure_remote_directory(sftp: &Sftp, path: &Path) -> AppResult<()> {
             continue;
         }
 
-        if absolute {
-            if current.is_empty() {
-                current.push('/');
-            } else if !current.ends_with('/') {
-                current.push('/');
-            }
-        } else if !current.is_empty() {
+        if (absolute && !current.ends_with('/')) || (!absolute && !current.is_empty()) {
             current.push('/');
         }
 
@@ -102,13 +108,13 @@ pub fn read_text_file(sftp: &Sftp, path: &str) -> AppResult<String> {
         ));
     }
 
-    if let Some(size) = stat.size {
-        if size > MAX_EDITOR_BYTES as u64 {
-            return Err(AppError::Sftp(format!(
-                "File is too large to open in the editor (limit: {} KB).",
-                MAX_EDITOR_BYTES / 1024,
-            )));
-        }
+    if let Some(size) = stat.size
+        && size > MAX_EDITOR_BYTES as u64
+    {
+        return Err(AppError::Sftp(format!(
+            "File is too large to open in the editor (limit: {} KB).",
+            MAX_EDITOR_BYTES / 1024,
+        )));
     }
 
     let mut source = sftp.open(file_path)?;
@@ -128,17 +134,28 @@ pub fn read_text_file(sftp: &Sftp, path: &str) -> AppResult<String> {
 pub fn write_text_file(sftp: &Sftp, path: &str, content: &str) -> AppResult<()> {
     let file_path = Path::new(path);
 
-    if let Ok(stat) = sftp.stat(file_path) {
-        if remote_kind(sftp, file_path, stat.perm).eq(&FileKind::Directory) {
-            return Err(AppError::Sftp(
-                "Cannot save editor contents into a directory.".into(),
-            ));
-        }
+    if let Ok(stat) = sftp.stat(file_path)
+        && remote_kind(sftp, file_path, stat.perm).eq(&FileKind::Directory)
+    {
+        return Err(AppError::Sftp(
+            "Cannot save editor contents into a directory.".into(),
+        ));
     }
 
     let mut target = sftp.create(file_path)?;
     target.write_all(content.as_bytes())?;
     target.flush()?;
+    Ok(())
+}
+
+pub fn create_directory(sftp: &Sftp, path: &str) -> AppResult<()> {
+    if sftp.lstat(Path::new(path)).is_ok() {
+        return Err(AppError::Sftp(
+            "An entry with that name already exists.".into(),
+        ));
+    }
+
+    sftp.mkdir(Path::new(path), 0o755)?;
     Ok(())
 }
 
@@ -464,8 +481,15 @@ fn remote_kind(sftp: &Sftp, path: &Path, perm: Option<u32>) -> FileKind {
 
 fn delete_entry_with_depth(sftp: &Sftp, path: &str, depth: usize) -> AppResult<()> {
     ensure_recursion_budget(depth)?;
-    let stat = sftp.stat(Path::new(path))?;
-    if remote_kind(sftp, Path::new(path), stat.perm).eq(&FileKind::Directory) {
+    // `lstat` so that a symlink is removed itself rather than having the
+    // directory it points to emptied.
+    let stat = sftp.lstat(Path::new(path))?;
+    let kind = match stat.perm {
+        Some(_) => infer_kind(stat.perm),
+        None => remote_kind(sftp, Path::new(path), None),
+    };
+
+    if kind == FileKind::Directory {
         for (child_path, _) in sftp.readdir(Path::new(path))? {
             let Some(name) = child_path.file_name().and_then(|value| value.to_str()) else {
                 return Err(AppError::Sftp(

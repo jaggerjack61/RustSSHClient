@@ -2,6 +2,9 @@
 name = "rust_ssh_client"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
+description = "A native SSH client with a terminal, file explorer and remote editor"
+repository = "https://github.com/jaggerjack61/RustSSHClient"
 
 [dependencies]
 aes-gcm = "0.10"
@@ -10,7 +13,7 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["clock", "serde"] }
 crossbeam-channel = "0.5"
 directories = "5"
-iced = { version = "0.14", features = ["tokio", "highlighter", "markdown"] }
+iced = { version = "0.14", features = ["tokio", "highlighter", "markdown", "lazy"] }
 keyring = "3"
 rand = "0.8"
 rfd = "0.15"
@@ -25,6 +28,8 @@ uuid = { version = "1", features = ["serde", "v4"] }
 vt100 = "0.16"
 walkdir = "2"
 webbrowser = "1"
+iced_fonts = { version = "0.3", features = ["lucide"] }
 
 [dev-dependencies]
+png = "0.18"
 tempfile = "3"

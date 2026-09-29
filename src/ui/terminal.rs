@@ -1,292 +1,185 @@
 use iced::font::{Style as FontStyle, Weight};
+use iced::widget::text::{LineHeight, Wrapping};
 use iced::widget::{
-    Space, button, column, container, progress_bar, rich_text, row, scrollable, span, text,
+    Space, button, column, container, lazy, mouse_area, rich_text, row, sensor, span, stack, text,
 };
-use iced::{Background, Color, Element, Font, Length};
+use iced::{Alignment, Background, Color, Element, Font, Length, Size};
 
 use crate::app::messages::Message;
 use crate::app::state::AppState;
-use crate::models::WorkspaceTab;
+use crate::ssh::terminal::TerminalStyleSpan;
 
-use super::{editor, file_tree, styles};
+use super::components::{self, icon, lucide};
+use super::theme;
 
-pub fn workspace_view(state: &AppState) -> Element<'_, Message> {
-    let tab_bar = workspace_tab_bar(state);
+pub const FONT_SIZE: f32 = 13.0;
+/// JetBrains Mono advances exactly 0.6em per cell.
+pub const CELL_WIDTH: f32 = FONT_SIZE * 0.6;
+pub const LINE_HEIGHT: f32 = 17.0;
+const PADDING_X: f32 = 14.0;
+const PADDING_Y: f32 = 10.0;
 
-    let panel_body: Element<'_, Message> = match &state.workspace.active_tab {
-        WorkspaceTab::Terminal => terminal_panel(state),
-        WorkspaceTab::Editor(_) => editor::view(state),
-    };
-
-    let content = column![
-        row![
-            file_tree::view(state),
-            column![tab_bar, panel_body]
-                .width(Length::Fill)
-                .height(Length::Fill),
-        ]
-        .width(Length::Fill)
-        .height(Length::Fill)
-    ]
-    .height(Length::Fill);
-
-    container(content)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style(styles::app_window)
-        .into()
+/// Terminal grid (columns, rows) that fits in a viewport of `size`.
+pub fn grid_size(size: Size) -> (u16, u16) {
+    let cols = ((size.width - 2.0 * PADDING_X) / CELL_WIDTH).floor();
+    let rows = ((size.height - 2.0 * PADDING_Y) / LINE_HEIGHT).floor();
+    (
+        cols.clamp(20.0, 500.0) as u16,
+        rows.clamp(5.0, 300.0) as u16,
+    )
 }
 
-fn workspace_tab_bar(state: &AppState) -> Element<'_, Message> {
-    let bash_active = matches!(state.workspace.active_tab, WorkspaceTab::Terminal);
-    let connected_peer = if state.workspace.connected_peer.trim().is_empty() {
-        "Awaiting session".to_string()
-    } else {
-        state.workspace.connected_peer.clone()
-    };
-    let bash_tab = container(
-        row![
-            button(
-                row![
-                    text(">_").size(11).color(Color::WHITE),
-                    text("bash").size(12).color(Color::WHITE),
-                ]
-                .spacing(6)
-                .align_y(iced::Alignment::Center),
-            )
-            .on_press(Message::ActivateTerminalTab)
-            .padding([6, 14])
-            .style(if bash_active {
-                styles::workspace_tab_active_button
-            } else {
-                styles::workspace_tab_button
-            })
-        ]
-        .align_y(iced::Alignment::Center),
-    )
-    .style(if bash_active {
-        styles::workspace_tab_active_container
-    } else {
-        styles::workspace_tab_container
-    });
+pub fn view(state: &AppState) -> Element<'_, Message> {
+    let terminal = &state.workspace.terminal;
+    let show_cursor = state.workspace.terminal_cursor_visible && state.modal.is_none();
 
-    let tabs = state.workspace.editor_tabs.iter().fold(
-        row![bash_tab].spacing(8).align_y(iced::Alignment::Center),
-        |row, editor_tab| {
-            let is_active = matches!(
-                &state.workspace.active_tab,
-                WorkspaceTab::Editor(path) if path == &editor_tab.path
-            );
-            let label = if editor_tab.is_loading {
-                format!("{}...", editor_tab.title)
-            } else if editor_tab.is_dirty {
-                format!("*{}", editor_tab.title)
-            } else {
-                editor_tab.title.clone()
-            };
-
-            row.push(
-                container(
-                    row![
-                        button(text(label).size(12).color(Color::WHITE))
-                            .on_press(Message::ActivateEditorTab(editor_tab.path.clone()))
-                            .padding([6, 14])
-                            .style(if is_active {
-                                styles::workspace_tab_active_button
-                            } else {
-                                styles::workspace_tab_button
-                            }),
-                        button(text("x").size(11).color(styles::text_slate_500()))
-                            .on_press(Message::CloseEditorTab(editor_tab.path.clone()))
-                            .padding([6, 8])
-                            .style(styles::workspace_tab_close_button),
-                    ]
-                    .spacing(2)
-                    .align_y(iced::Alignment::Center),
-                )
-                .style(if is_active {
-                    styles::workspace_tab_active_container
-                } else {
-                    styles::workspace_tab_container
-                }),
-            )
+    // Rebuilding and re-shaping the grid is the most expensive part of the
+    // UI, so only do it when the terminal actually changed.
+    let screen = lazy(
+        (terminal.generation(), show_cursor),
+        move |&(_, show_cursor)| -> Element<'static, Message> {
+            rich_text(terminal_spans(
+                state
+                    .workspace
+                    .terminal
+                    .styled_spans_with_cursor(show_cursor),
+            ))
+            .font(theme::MONO_FONT)
+            .size(FONT_SIZE)
+            .line_height(LineHeight::Absolute(LINE_HEIGHT.into()))
+            .wrapping(Wrapping::None)
+            .into()
         },
     );
 
-    container(
-        container(
-            row![
-                tabs,
-                Space::new().width(Length::Fill),
-                column![
-                    text("ACTIVE SESSION")
-                        .size(10)
-                        .color(styles::text_slate_500()),
-                    text(connected_peer)
-                        .size(12)
-                        .color(styles::text_slate_300()),
-                ]
-                .spacing(2)
-                .align_x(iced::Alignment::End),
-            ]
-            .align_y(iced::Alignment::Center),
-        )
+    let viewport = container(screen)
+        .padding([PADDING_Y, PADDING_X])
         .width(Length::Fill)
-        .center_y(Length::Fill),
+        .height(Length::Fill)
+        .clip(true)
+        .style(theme::terminal);
+
+    let viewport = sensor(
+        mouse_area(viewport)
+            .on_scroll(Message::TerminalScrolled)
+            .interaction(iced::mouse::Interaction::Text),
     )
-    .padding([8, 16])
-    .height(Length::Fixed(styles::workspace_header_height()))
-    .width(Length::Fill)
-    .style(styles::terminal_header)
+    .on_show(Message::TerminalViewportResized)
+    .on_resize(Message::TerminalViewportResized);
+
+    let offset = terminal.scroll_offset();
+    if offset == 0 {
+        return viewport.into();
+    }
+
+    let jump = button(
+        row![
+            icon(lucide::arrow_down_to_line(), 13.0, theme::TEXT),
+            text(format!("{offset} lines up \u{00b7} Jump to latest"))
+                .size(theme::TEXT_SM)
+                .font(theme::MEDIUM),
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center),
+    )
+    .padding([6, 12])
+    .on_press(Message::TerminalScrollToBottom)
+    .style(theme::secondary_button);
+
+    stack![
+        viewport,
+        container(container(jump).style(theme::popover))
+            .align_right(Length::Fill)
+            .align_bottom(Length::Fill)
+            .padding(16),
+    ]
     .into()
 }
 
-fn terminal_panel(state: &AppState) -> Element<'_, Message> {
-    let terminal_content = rich_text(terminal_spans(state))
-        .size(14)
-        .width(Length::Fill)
-        .wrapping(iced::widget::text::Wrapping::None);
+/// Status bar content shown while the terminal tab is active.
+pub fn status_items(state: &AppState) -> Element<'_, Message> {
+    let (rows, cols) = state.workspace.terminal.size();
 
-    let terminal_output = container(
-        scrollable(terminal_content)
-            .anchor_bottom()
-            .style(styles::dark_scrollable)
-            .height(Length::Fill)
-            .width(Length::Fill),
-    )
-    .padding([20, 22])
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .style(styles::terminal_area);
+    let actions = row![
+        components::icon_button(
+            lucide::copy(),
+            "Copy screen",
+            Some(Message::CopyTerminalOutput)
+        ),
+        components::icon_button(
+            lucide::clipboard_paste(),
+            "Paste",
+            Some(Message::PasteTerminalInput)
+        ),
+        components::icon_button(
+            lucide::eraser(),
+            "Clear screen",
+            Some(Message::ClearTerminal)
+        ),
+    ]
+    .spacing(2)
+    .align_y(Alignment::Center);
 
-    let transfers: Element<'_, Message> = if state.workspace.transfers.is_empty() {
-        Space::new().into()
-    } else {
-        state
-            .workspace
-            .transfers
-            .iter()
-            .fold(column![].spacing(4), |col, transfer| {
-                let progress = transfer.percent_complete();
-                col.push(
-                    row![
-                        text(&transfer.label)
-                            .size(11)
-                            .color(styles::text_slate_400())
-                            .width(Length::FillPortion(3)),
-                        container(progress_bar(0.0..=1.0, progress).girth(4))
-                            .width(Length::FillPortion(2)),
-                        text(format!("{:>3}%", (progress * 100.0).round() as u8))
-                            .size(11)
-                            .color(styles::text_slate_500()),
-                    ]
-                    .spacing(8)
-                    .align_y(iced::Alignment::Center),
-                )
-            })
-            .into()
-    };
-
-    let transfers = if state.workspace.transfers.is_empty() {
-        transfers
-    } else {
-        container(
-            column![
-                text("TRANSFER QUEUE")
-                    .size(10)
-                    .color(styles::text_slate_500()),
-                transfers,
-            ]
-            .spacing(8),
-        )
-        .padding([16, 10])
-        .width(Length::Fill)
-        .into()
-    };
-
-    let status_bar = container(
-        container(
-            row![
-                row![
-                    container(Space::new().width(5).height(5)).style(|_theme: &iced::Theme| {
-                        container::Style {
-                            background: Some(iced::Background::Color(styles::primary())),
-                            border: iced::Border {
-                                radius: 3.into(),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }
-                    }),
-                    text("Live shell").size(11).color(styles::text_slate_300()),
-                    text("UTF-8").size(11).color(styles::text_slate_500()),
-                    text("SSHv2").size(11).color(styles::text_slate_500()),
-                ]
-                .spacing(12)
-                .align_y(iced::Alignment::Center),
-                Space::new().width(Length::Fill),
-                row![
-                    button(text("Clear").size(11).color(styles::text_slate_500()))
-                        .on_press(Message::ClearTerminal)
-                        .padding([4, 8])
-                        .style(styles::status_bar_button),
-                    button(text("Scrollback").size(11).color(styles::text_slate_500()))
-                        .on_press(Message::CopyTerminalOutput)
-                        .padding([4, 8])
-                        .style(styles::status_bar_button),
-                    button(text("New Session").size(11).color(styles::primary()),)
-                        .on_press(Message::DisconnectPressed)
-                        .padding([4, 8])
-                        .style(styles::new_session_button),
-                ]
-                .spacing(12),
-            ]
-            .align_y(iced::Alignment::Center),
-        )
-        .width(Length::Fill)
-        .center_y(Length::Fill),
-    )
-    .padding([8, 16])
-    .height(Length::Fixed(styles::workspace_footer_height()))
-    .width(Length::Fill)
-    .style(styles::status_bar);
-
-    column![terminal_output, transfers, status_bar,]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    row![
+        text(format!("{cols}\u{00d7}{rows}"))
+            .size(theme::TEXT_XS)
+            .font(theme::MONO_FONT)
+            .color(theme::TEXT_FAINT),
+        text("xterm-256color")
+            .size(theme::TEXT_XS)
+            .color(theme::TEXT_FAINT),
+        text("UTF-8").size(theme::TEXT_XS).color(theme::TEXT_FAINT),
+        Space::new().width(Length::Fill),
+        text(format!(
+            "{} copy \u{00b7} {} paste",
+            copy_shortcut(),
+            paste_shortcut()
+        ))
+        .size(theme::TEXT_XS)
+        .color(theme::TEXT_DISABLED),
+        actions,
+    ]
+    .spacing(14)
+    .align_y(Alignment::Center)
+    .into()
 }
 
-fn terminal_spans(state: &AppState) -> Vec<iced::widget::text::Span<'static>> {
-    state
-        .workspace
-        .terminal
-        .styled_spans_with_cursor(state.workspace.terminal_cursor_visible)
+fn copy_shortcut() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "\u{2318}C"
+    } else {
+        "Ctrl+Shift+C"
+    }
+}
+
+fn paste_shortcut() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "\u{2318}V"
+    } else {
+        "Ctrl+Shift+V"
+    }
+}
+
+fn terminal_spans(segments: Vec<TerminalStyleSpan>) -> Vec<iced::widget::text::Span<'static>> {
+    let default_foreground = rgb(crate::ssh::terminal::DEFAULT_FOREGROUND);
+
+    segments
         .into_iter()
         .map(|segment| {
             let font = terminal_font(&segment);
-            let mut text_span = span(segment.text).font(font);
+            let mut foreground = segment.foreground.map(rgb).unwrap_or(default_foreground);
+            if segment.dim {
+                foreground.a = 0.6;
+            }
 
-            let foreground = segment
-                .foreground
-                .map(|(red, green, blue)| terminal_foreground(red, green, blue, segment.dim))
-                .unwrap_or_else(|| {
-                    let mut color = styles::text_slate_300();
-                    if segment.dim {
-                        color.a = 0.72;
-                    }
-                    color
-                });
-
-            text_span = text_span.color(foreground);
+            let mut text_span = span(segment.text).font(font).color(foreground);
 
             if segment.underline {
                 text_span = text_span.underline(true);
             }
 
-            if let Some((red, green, blue)) = segment.background {
-                text_span =
-                    text_span.background(Background::Color(Color::from_rgb8(red, green, blue)));
+            if let Some(background) = segment.background {
+                text_span = text_span.background(Background::Color(rgb(background)));
             }
 
             text_span
@@ -294,24 +187,58 @@ fn terminal_spans(state: &AppState) -> Vec<iced::widget::text::Span<'static>> {
         .collect()
 }
 
-fn terminal_font(segment: &crate::ssh::terminal::TerminalStyleSpan) -> Font {
+fn rgb((red, green, blue): (u8, u8, u8)) -> Color {
+    Color::from_rgb8(red, green, blue)
+}
+
+fn terminal_font(segment: &TerminalStyleSpan) -> Font {
     Font {
-        family: Font::MONOSPACE.family,
         weight: if segment.bold {
             Weight::Bold
         } else {
             Weight::Normal
         },
-        stretch: Font::MONOSPACE.stretch,
         style: if segment.italic {
             FontStyle::Italic
         } else {
             FontStyle::Normal
         },
+        ..theme::MONO_FONT
     }
 }
 
-fn terminal_foreground(red: u8, green: u8, blue: u8, dim: bool) -> Color {
-    let alpha = if dim { 0.72 } else { 1.0 };
-    Color::from_rgba8(red, green, blue, alpha)
+/// Placeholder shown when the terminal is not available.
+pub fn empty() -> Element<'static, Message> {
+    container(
+        column![
+            icon(lucide::terminal(), 22.0, theme::TEXT_DISABLED),
+            text("No active session")
+                .size(theme::TEXT_MD)
+                .color(theme::TEXT_FAINT),
+        ]
+        .spacing(8)
+        .align_x(Alignment::Center),
+    )
+    .center(Length::Fill)
+    .style(theme::terminal)
+    .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use iced::Size;
+
+    #[test]
+    fn grid_size_accounts_for_padding_and_cell_metrics() {
+        let (cols, rows) = super::grid_size(Size::new(
+            80.0 * super::CELL_WIDTH + 28.5,
+            24.0 * super::LINE_HEIGHT + 20.5,
+        ));
+        assert_eq!((cols, rows), (80, 24));
+    }
+
+    #[test]
+    fn grid_size_is_clamped_for_tiny_viewports() {
+        assert_eq!(super::grid_size(Size::new(10.0, 10.0)), (20, 5));
+    }
 }
